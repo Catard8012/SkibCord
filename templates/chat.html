@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='Images/hbclogo.png') }}">
+    <title>HBchat</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        function setCookie(name, value, days) {
+            const date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            const expires = "expires=" + date.toUTCString();
+            document.cookie = name + "=" + value + ";" + expires + ";path=/";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i].trim();
+                if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+            }
+            return null;
+        }
+
+        function deleteCookie(name) {
+            document.cookie = name + '=; Max-Age=-99999999;';
+        }
+
+        function generateSessionId() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function toggleSidebar() {
+            const mainContainer = document.getElementById('main-container');
+            const toggleButton = document.querySelector('.sidebar-toggle img');
+            mainContainer.classList.toggle('sidebar-collapsed');
+            if (mainContainer.classList.contains('sidebar-collapsed')) {
+                toggleButton.src = "{{ url_for('static', filename='Images/arrow2.png') }}";
+            } else {
+                toggleButton.src = "{{ url_for('static', filename='Images/arrow1.png') }}";
+            }
+        }
+
+        function setColorScheme(scheme) {
+            document.documentElement.className = scheme === 2 ? 'scheme2' : '';
+            setCookie('color_scheme', scheme, 7);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            let username = getCookie('username');
+            let sessionId = getCookie('session_id');
+            let lastUsernameChange = getCookie('last_username_change');
+            let lastImageUpload = getCookie('last_image_upload');
+            let lastImage = getCookie('last_image');
+            const savedScheme = getCookie('color_scheme');
+            if (savedScheme) {
+                setColorScheme(parseInt(savedScheme));
+            }
+
+            if (!username) {
+                username = prompt("Please enter your username:", "Guest");
+                while (username && username.length > 30) {
+                    alert("Username must be 30 characters or less.");
+                    username = prompt("Please enter your username again:", "Guest");
+                }
+                if (!username) username = "Guest";
+                setCookie('username', username, 7);
+            }
+
+            if (!sessionId) {
+                sessionId = generateSessionId();
+                setCookie('session_id', sessionId, 7);
+            }
+
+            document.getElementById('current_username_nav').value = username;
+
+            const socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
+            const messages = document.querySelector('#messages');
+            const input = document.querySelector('#chat_input');
+            const sendButton = document.querySelector('#send_button');
+            const imageInput = document.querySelector('#image_input');
+            const xiaojiecat = document.querySelector('#xiaojiecat');
+            const onlineUsers = document.querySelector('#online-users .count');
+            const onlineUsersBox = document.getElementById('online-users-box');
+            const editIconNav = document.querySelector('#edit_icon_nav');
+            const currentUsernameNav = document.querySelector('#current_username_nav');
+            let lastMessageTimes = [];
+            const messageDelay = 5;
+            const messageThreshold = 3;
+            const cooldownPeriod = 5000;
+            let isInCooldown = false;
+            let isSpinning = false;
+
+            function handleJoin() {
+                socket.emit('join', { username: username, session_id: sessionId, is_new_user: false });
+            }
+
+            handleJoin();
+
+            function appendMessage(content, username = '', style = '') {
+                const p = document.createElement('p');
+                if (username) {
+                    const span = document.createElement('span');
+                    span.classList.add('username');
+                    span.textContent = username + ': ';
+                    p.appendChild(span);
+                }
+                p.appendChild(document.createTextNode(content));
+                p.classList.add('chat-message'); // Add this line to apply the chat-message class
+                if (style) {
+                    p.classList.add(style);
+                }
+                messages.appendChild(p);
+                ensureMessageLimit();
+                scrollToBottom();
+                checkForXiaojiecat(content, username);
+            }
+
+            function appendImage(imageData, username = '') {
+                const p = document.createElement('p');
+                if (username) {
+                    const span = document.createElement('span');
+                    span.classList.add('username');
+                    span.textContent = username + ': ';
+                    p.appendChild(span);
+                }
+                const img = document.createElement('img');
+                img.src = imageData;
+                img.classList.add('chat-image');
+                p.appendChild(img);
+                messages.appendChild(p);
+                ensureMessageLimit();
+                scrollToBottom();
+            }
+
+            function scrollToBottom() {
+                messages.scrollTop = messages.scrollHeight;
+            }
+
+            function ensureMessageLimit() {
+                const maxMessages = 30;
+                while (messages.children.length > maxMessages) {
+                    messages.removeChild(messages.firstChild);
+                }
+            }
+
+            function sendMessage() {
+                const now = new Date().getTime();
+
+                lastMessageTimes = lastMessageTimes.filter(time => now - time < messageDelay);
+
+                if (isInCooldown) {
+                    alert("Please wait before sending more messages.");
+                    return;
+                }
+
+                if (lastMessageTimes.length >= messageThreshold) {
+                    alert("Please don't spam :(");
+                    lastMessageTimes = [];
+                    isInCooldown = true;
+                    setTimeout(() => {
+                        isInCooldown = false;
+                    }, cooldownPeriod);
+                    return;
+                }
+
+                const text = input.value.trim();
+                if (!text) return;
+
+                socket.emit('message', { username: username, text: text, session_id: sessionId });
+                input.value = '';
+                lastMessageTimes.push(now);
+            }
+
+            function changeUsername(newUsername) {
+                const now = new Date().getTime();
+                const thirtyMinutes = 30 * 60 * 1000;
+
+                if (lastUsernameChange && (now - new Date(lastUsernameChange).getTime()) < thirtyMinutes) {
+                    const nextChangeTime = new Date(new Date(lastUsernameChange).getTime() + thirtyMinutes);
+                    const nextChangeTimeStr = nextChangeTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    alert(`You can change your username again at ${nextChangeTimeStr}.`);
+                    return;
+                }
+
+                if (newUsername && newUsername.length <= 30) {
+                    socket.emit('change_username', { old_username: username, new_username: newUsername, session_id: sessionId });
+                    username = newUsername;
+                    setCookie('username', newUsername, 7);
+                    currentUsernameNav.value = newUsername;
+                    setCookie('last_username_change', new Date().toISOString(), 7);
+                    lastUsernameChange = new Date().toISOString();
+                } else {
+                    alert("Username must be 30 characters or less.");
+                }
+            }
+
+            sendButton.onclick = sendMessage;
+
+            input.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    sendMessage();
+                    event.preventDefault();
+                }
+            });
+
+            editIconNav.onclick = () => {
+                const now = new Date().getTime();
+                const thirtyMinutes = 30 * 60 * 1000;
+
+                if (lastUsernameChange && (now - new Date(lastUsernameChange).getTime()) < thirtyMinutes) {
+                    const nextChangeTime = new Date(new Date(lastUsernameChange).getTime() + thirtyMinutes);
+                    const nextChangeTimeStr = nextChangeTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    alert(`You can change your username again at ${nextChangeTimeStr}.`);
+                } else {
+                    const newUsername = prompt("Enter new username:", username);
+                    if (newUsername !== null) {
+                        changeUsername(newUsername);
+                    }
+                }
+            };
+
+            imageInput.addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    if (file.size > 100 * 1024) { // Check if file size is greater than 100KB
+                        alert("Please upload images smaller than 100KB.");
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const imageData = e.target.result;
+                        const now = new Date().getTime();
+                        const lastImageUploadTime = getCookie('last_image_upload');
+                        const fiveMinutes = 5 * 60 * 1000;
+
+                        if (lastImageUploadTime && (now - new Date(lastImageUploadTime).getTime()) < fiveMinutes) {
+                            const remainingTime = fiveMinutes - (now - new Date(lastImageUploadTime).getTime());
+                            const minutes = Math.floor(remainingTime / 60000);
+                            const seconds = Math.floor((remainingTime % 60000) / 1000);
+                            alert(`Please wait ${minutes}:${seconds < 10 ? '0' : ''}${seconds} before uploading another image.`);
+                        } else if (lastImage === imageData) {
+                            alert("You cannot upload the same image twice.");
+                        } else {
+                            socket.emit('image', { username: username, image: imageData, session_id: sessionId });
+                            setCookie('last_image_upload', new Date().toISOString(), 7);
+                            setCookie('last_image', imageData, 7);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            socket.on('message', function(data) {
+                appendMessage(data.text, data.username, data.color ? 'timeout-message' : '');
+            });
+
+            socket.on('image', function(data) {
+                appendImage(data.image, data.username);
+            });
+
+            socket.on('user joined', function(data) {
+                appendMessage(data.message, '', 'system-message');
+            });
+
+            socket.on('user left', function(data) {
+                appendMessage(data.message, '', 'system-message');
+            });
+
+            socket.on('error', function(data) {
+                alert(data.message);
+                if (data.message === 'Username already taken') {
+                    const newUsername = prompt("Username already taken, please enter another username:", "Guest");
+                    if (newUsername !== null) {
+                        changeUsername(newUsername);
+                    }
+                }
+            });
+
+            socket.on('update user count', function(data) {
+                onlineUsers.textContent = `${data.count} users online`;
+            });
+
+            socket.on('username_changed', function(data) {
+                appendMessage(`${data.old_username} changed their username to ${data.new_username}`, '', 'system-message');
+            });
+
+            socket.on('update online users', function(data) {
+                onlineUsersBox.innerHTML = '';
+                data.users.forEach(user => {
+                    const userElement = document.createElement('div');
+                    userElement.classList.add('user');
+                    userElement.textContent = user;
+                    onlineUsersBox.appendChild(userElement);
+                });
+            });
+
+            const uploadIcon = document.getElementById('upload_icon');
+            uploadIcon.onmouseover = function() {
+                uploadIcon.src = "{{ url_for('static', filename='Images/plus2.png') }}";
+            };
+            uploadIcon.onmouseout = function() {
+                uploadIcon.src = "{{ url_for('static', filename='Images/plus.png') }}";
+            };
+
+            function checkForXiaojiecat(message, username) {
+                const regex = /xiaojie cat/i;
+                if (regex.test(message) && !isSpinning) {
+                    showXiaojiecat();
+                }
+            }
+
+            function showXiaojiecat() {
+                const x = Math.random() * (window.innerWidth - 100);
+                const y = Math.random() * (window.innerHeight - 100);
+
+                xiaojiecat.style.left = `${x}px`;
+                xiaojiecat.style.top = `${y}px`;
+                xiaojiecat.style.display = 'block';
+
+                xiaojiecat.classList.remove('spin');
+                void xiaojiecat.offsetWidth;
+                xiaojiecat.classList.add('spin');
+
+                isSpinning = true;
+
+                setTimeout(() => {
+                    xiaojiecat.style.display = 'none';
+                    isSpinning = false;
+                }, 1000);
+            }
+        });
+
+        window.addEventListener('beforeunload', function() {
+            const sessionId = getCookie('session_id');
+            const socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
+            socket.emit('disconnect', { session_id: sessionId });
+        });
+    </script>
+</head>
+<body>
+    <nav class="top-nav">
+        <div class="nav-title">HB Chat</div>
+        <div class="username-container-nav">
+            <input type="text" id="current_username_nav" class="username-display-nav" readonly>
+            <img src="{{ url_for('static', filename='Images/pen.png') }}" alt="Edit" id="edit_icon_nav">
+        </div>
+    </nav>
+    <div id="main-container" class="main-container">
+        <div id="chat-container">
+            <div id="messages" class="chat-messages"></div>
+            <div class="input-container">
+                <div class="input-area">
+                    <input type="text" id="chat_input" class="chat-input" placeholder="Type a message...">
+                    <button id="send_button">Send</button>
+                    <input type="file" id="image_input" style="display: none;" accept="image/*">
+                    <label for="image_input" id="image_input_label">
+                        <img src="{{ url_for('static', filename='Images/plus.png') }}" alt="Upload" id="upload_icon">
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="sidebar" id="sidebar">
+            <button class="sidebar-toggle" onclick="toggleSidebar()">
+                <img src="{{ url_for('static', filename='Images/arrow1.png') }}" alt="Toggle Sidebar">
+            </button>
+            <div class="sidebar-content">
+                <div class="sidebar-title">The Goon Gang</div>
+                <div class="sidebar-text">
+                    <div class="sidebar-padding"></div>
+                    <div class="sidebar-subtitle">Commands</div>
+                    <div class="sidebar-padding-small"></div>
+                    <div class="sidebar-command">F3 - Bring up Google Doc</div>
+                    <div class="sidebar-command">Xiaojie Cat - Cat image</div>
+                    <div class="sidebar-padding"></div>
+                    <div class="sidebar-subtitle">Theme</div>
+                    <button class="theme-button" onclick="setColorScheme(1)">Color Scheme 1</button>
+                    <button class="theme-button" onclick="setColorScheme(2)">Color Scheme 2</button>
+                    <div class="sidebar-padding"></div>
+                    <div class="sidebar-subtitle">Online Users:</div>
+                    <div class="online-users-box" id="online-users-box"></div>
+                    <div id="online-users" class="online-users">
+                        <span class="dot"></span><span class="count">0 users online</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <img id="xiaojiecat" src="{{ url_for('static', filename='Images/xiaojiecat.png') }}" alt="Xiaojie Cat" style="display: none; position: absolute;">
+</body>
+</html>
