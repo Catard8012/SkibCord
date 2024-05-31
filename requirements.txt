@@ -1,5 +1,5 @@
-Flask==2.0.2
-flask_socketio==5.1.1
-flask_wtf==0.15.1
-bleach==4.1.0
-Pillow==8.4.0
+Flask==3.0.3
+Flask-SocketIO==5.3.6
+Flask-WTF==1.2.1
+bleach==6.1.0
+pillow==10.3.0
