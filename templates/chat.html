@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='Images/hbclogo.png') }}">
-    <title>HBchat</title>
+    <link rel="icon" type="image/png" id="favicon" href="{{ url_for('static', filename='Images/hbclogo.png') }}">
+    <title>HB Chat</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script>
@@ -50,6 +50,24 @@
         function setColorScheme(scheme) {
             document.documentElement.className = scheme === 2 ? 'scheme2' : '';
             setCookie('color_scheme', scheme, 7);
+            document.querySelectorAll('.theme-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            document.getElementById(`scheme${scheme}-button`).classList.add('active');
+        }
+
+        function toggleFullScreenImage() {
+            const fullScreenImage = document.getElementById('full-screen-image');
+            const favicon = document.getElementById('favicon');
+            if (fullScreenImage.style.display === 'none' || fullScreenImage.style.display === '') {
+                fullScreenImage.style.display = 'block';
+                document.title = 'Google Docs';
+                favicon.href = "{{ url_for('static', filename='Images/Google_Doc_Logo.png') }}";
+            } else {
+                fullScreenImage.style.display = 'none';
+                document.title = 'HB Chat';
+                favicon.href = "{{ url_for('static', filename='Images/hbclogo.png') }}";
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -336,6 +354,16 @@
                     isSpinning = false;
                 }, 1000);
             }
+
+            // Event listener for the 'Esc' key to toggle the full-screen image
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    toggleFullScreenImage();
+                }
+            });
+
+            // Ensure the full-screen image is hidden on load
+            document.getElementById('full-screen-image').style.display = 'none';
         });
 
         window.addEventListener('beforeunload', function() {
@@ -377,12 +405,12 @@
                     <div class="sidebar-padding"></div>
                     <div class="sidebar-subtitle">Commands</div>
                     <div class="sidebar-padding-small"></div>
-                    <div class="sidebar-command">F3 - Bring up Google Doc</div>
+                    <div class="sidebar-command">Esc - Bring up Google Doc</div>
                     <div class="sidebar-command">Xiaojie Cat - Cat image</div>
                     <div class="sidebar-padding"></div>
                     <div class="sidebar-subtitle">Theme</div>
-                    <button class="theme-button" onclick="setColorScheme(1)">Color Scheme 1</button>
-                    <button class="theme-button" onclick="setColorScheme(2)">Color Scheme 2</button>
+                    <button id="scheme1-button" class="theme-button" onclick="setColorScheme(1)">Color Scheme 1</button>
+                    <button id="scheme2-button" class="theme-button" onclick="setColorScheme(2)">Color Scheme 2</button>
                     <div class="sidebar-padding"></div>
                     <div class="sidebar-subtitle">Online Users:</div>
                     <div class="online-users-box" id="online-users-box"></div>
@@ -394,5 +422,8 @@
         </div>
     </div>
     <img id="xiaojiecat" src="{{ url_for('static', filename='Images/xiaojiecat.png') }}" alt="Xiaojie Cat" style="display: none; position: absolute;">
+    <div id="full-screen-image" class="full-screen-image" style="display: none;">
+        <img src="{{ url_for('static', filename='Images/Google_Doc.png') }}" alt="Google Doc">
+    </div>
 </body>
 </html>
