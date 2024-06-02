@@ -188,6 +188,8 @@ body {
     border: 1px solid var(--main-color);
     word-wrap: break-word;
     word-break: break-all;
+    height: calc(100% - 50px); /* Adjust height to prevent overflow */
+    max-height: calc(100vh - 180px); /* Adjust max height to fit within the viewport */
 }
 
 /* Chat input styling */
@@ -253,17 +255,6 @@ body {
 
 #send_button:hover {
     background-color: #4cae4c;
-}
-
-/* Chat messages styling */
-.chat-messages {
-    overflow-y: auto;
-    flex-grow: 1;
-    padding: 10px;
-    background: var(--secondary-color);
-    border: 1px solid var(--main-color);
-    word-wrap: break-word;
-    word-break: break-all;
 }
 
 /* Animation keyframes */
@@ -369,4 +360,49 @@ body {
     margin-bottom: 5px;
     font-size: 14px;
     color: var(--text-color); /* Make the text white */
+}
+
+/* Theme button styling */
+.theme-button {
+    border: none;
+    padding: 8px 16px; /* Smaller size */
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 14px;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: 16px;
+    transition: background-color 0.3s, color 0.3s;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+}
+
+.theme-button:hover {
+    background-color: var(--main-color);
+}
+
+.theme-button.active {
+    background-color: var(--main-color);
+    color: var(--text-color);
+}
+
+/* Full-screen image styling */
+.full-screen-image {
+    display: none; /* Ensure it is not displayed on load */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 9999; /* Ensure it's in front of everything */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.full-screen-image img {
+    max-width: 100%;
+    max-height: 100%;
 }
