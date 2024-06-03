@@ -114,6 +114,8 @@
             const savedScheme = getCookie('color_scheme');
             if (savedScheme) {
                 setColorScheme(parseInt(savedScheme));
+            } else {
+                setColorScheme(1); // Set default color scheme to 1
             }
 
             if (!username) {
