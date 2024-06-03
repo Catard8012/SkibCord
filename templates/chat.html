@@ -8,6 +8,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script>
+        let isHbLogo = true; // Flag to track the current favicon
+
         function setCookie(name, value, days) {
             const date = new Date();
             date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
@@ -69,6 +71,39 @@
                 favicon.href = "{{ url_for('static', filename='Images/hbclogo.png') }}";
             }
         }
+
+        // Function to change the favicon quickly
+        function changeFavicon(src) {
+            var link = document.getElementById('favicon');
+            if (link) {
+                link.href = src;
+            } else {
+                link = document.createElement('link');
+                link.id = 'favicon';
+                link.rel = 'icon';
+                link.href = src;
+                document.head.appendChild(link);
+            }
+        }
+
+        // Preload favicon images
+        var hbclogo = new Image();
+        hbclogo.src = "{{ url_for('static', filename='Images/hbclogo.png') }}";
+        var googleDocLogo = new Image();
+        googleDocLogo.src = "{{ url_for('static', filename='Images/Google_Doc_Logo.png') }}";
+
+        // Event listener for the 'Esc' key to toggle the full-screen image
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                toggleFullScreenImage();
+                if (isHbLogo) {
+                    changeFavicon("{{ url_for('static', filename='Images/Google_Doc_Logo.png') }}");
+                } else {
+                    changeFavicon("{{ url_for('static', filename='Images/hbclogo.png') }}");
+                }
+                isHbLogo = !isHbLogo; // Toggle the flag
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', () => {
             let username = getCookie('username');
@@ -354,13 +389,6 @@
                     isSpinning = false;
                 }, 1000);
             }
-
-            // Event listener for the 'Esc' key to toggle the full-screen image
-            document.addEventListener('keydown', function(event) {
-                if (event.key === 'Escape') {
-                    toggleFullScreenImage();
-                }
-            });
 
             // Ensure the full-screen image is hidden on load
             document.getElementById('full-screen-image').style.display = 'none';
