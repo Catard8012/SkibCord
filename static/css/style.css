@@ -76,7 +76,8 @@ body {
     height: 100vh;
     width: 100vw;
     margin-top: 60px; /* Adjust to fit below the nav bar */
-    position: border-box;
+    box-sizing: border-box;
+    padding: 2.5%; /* Add padding around the chat container */
 }
 
 /* Sidebar styling */
@@ -105,10 +106,9 @@ body {
 }
 
 .sidebar-title {
-    color: var(--text-color);
     font-size: 25px;
+    text-align: left;
     font-weight: bold;
-    text-align: center;
 }
 
 .sidebar-text {
@@ -116,6 +116,13 @@ body {
     width: 90%;
     text-align: left;
     margin-left: 13%;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: margin-left 0.5s; /* Smooth transition for margin-left */
+}
+
+.sidebar-collapsed .sidebar-text {
+    margin-left: 100%; /* Move text completely out of view */
 }
 
 .sidebar-subtitle {
@@ -168,11 +175,11 @@ body {
     flex-direction: column;
     justify-content: space-between;
     background-color: var(--main-color);
-    padding: 5px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    border: 35px solid var(--background-color); /* Add padding around the chat container */
+    padding: 5px; /* Add padding around the chat container */
+    border: 2% solid var(--background-color); /* Uniform border */
     transition: margin-right 0.5s; /* Smooth transition for width changes */
     margin-right: 240px; /* Ensure it doesn't overlap with the sidebar */
+    box-sizing: border-box;
 }
 
 .sidebar-collapsed #chat-container {
