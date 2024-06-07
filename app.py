@@ -116,7 +116,7 @@ def handle_join(data):
     username = sanitize_input(data.get('username', ''))
     session_id = data.get('session_id')
     username_lower = username.lower()
-    current_time = time.time()
+    # current_time = time.time()
 
     if validate_username(username):
         if session_id not in connected_users:
