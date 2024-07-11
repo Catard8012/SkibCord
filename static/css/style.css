@@ -8,11 +8,20 @@
 
 /* Color Scheme 2 */
 :root.scheme2 {
+    --main-color: #BC4014;
+    --secondary-color: #D6590D;
+    --text-color: white;
+    --background-color: #561F09;
+}
+
+/* Color Scheme 2 
+:root.scheme2 {
     --main-color: pink;
     --secondary-color: orange;
     --text-color: white;
     --background-color: red;
 }
+*/
 
 /* General body styling */
 body {
