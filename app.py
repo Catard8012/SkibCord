@@ -13,7 +13,7 @@ from datetime import datetime
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'W0rmyOn@St1ck'
 csrf = CSRFProtect(app)
-socketio = SocketIO(app, cors_allowed_origins="*", ping_interval=10, ping_timeout=60, transport="websocket")
+socketio = SocketIO(app, cors_allowed_origins="*", ping_interval=10, ping_timeout=60*2, transport="websocket")
 
 # Dictionaries for tracking sessions, usernames, and cooldowns
 session_message_times = {}
