@@ -3,3 +3,4 @@ Flask-SocketIO==5.3.6
 Flask-WTF==1.2.1
 bleach==6.1.0
 pillow==10.3.0
+gunicorn==22.0.0
