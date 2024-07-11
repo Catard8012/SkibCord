@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" type="image/png" id="favicon" href="{{ url_for('static', filename='Images/skibcordlogo.png') }}">
+    <link rel="icon" type="image/png" id="favicon" href="{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}">
     <title>SkibCord</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
@@ -42,11 +42,7 @@
             const mainContainer = document.getElementById('main-container');
             const toggleButton = document.querySelector('.sidebar-toggle img');
             mainContainer.classList.toggle('sidebar-collapsed');
-            if (mainContainer.classList.contains('sidebar-collapsed')) {
-                toggleButton.src = "{{ url_for('static', filename='Images/arrow2.png') }}";
-            } else {
-                toggleButton.src = "{{ url_for('static', filename='Images/arrow1.png') }}";
-            }
+            updateSidebarButtonImage();
         }
 
         function setColorScheme(scheme) {
@@ -56,6 +52,35 @@
                 button.classList.remove('active');
             });
             document.getElementById(`scheme${scheme}-button`).classList.add('active');
+            updateIcons();
+            updateFavicon();
+        }
+
+        function updateSidebarButtonImage() {
+            const toggleButton = document.querySelector('.sidebar-toggle img');
+            const colorScheme = getCookie('color_scheme') || 1;
+            if (document.getElementById('main-container').classList.contains('sidebar-collapsed')) {
+                toggleButton.src = colorScheme === '2' ? "{{ url_for('static', filename='Images/SidebarL-CS2.png') }}" : "{{ url_for('static', filename='Images/SidebarL-CS1.png') }}";
+            } else {
+                toggleButton.src = colorScheme === '2' ? "{{ url_for('static', filename='Images/SidebarR-CS2.png') }}" : "{{ url_for('static', filename='Images/SidebarR-CS1.png') }}";
+            }
+        }
+
+        function updateIcons() {
+            updateSidebarButtonImage();
+            const editIconNav = document.querySelector('#edit_icon_nav');
+            const colorScheme = getCookie('color_scheme') || 1;
+            editIconNav.src = colorScheme === '2' ? "{{ url_for('static', filename='Images/Pen-CS2.png') }}" : "{{ url_for('static', filename='Images/Pen-CS1.png') }}";
+        }
+
+        function updateFavicon() {
+            const colorScheme = getCookie('color_scheme') || 1;
+            const favicon = document.getElementById('favicon');
+            if (colorScheme == 2) {
+                favicon.href = "{{ url_for('static', filename='Images/Skibcordlogo-CS2.png') }}";
+            } else {
+                favicon.href = "{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}";
+            }
         }
 
         function toggleFullScreenImage() {
@@ -68,11 +93,10 @@
             } else {
                 fullScreenImage.style.display = 'none';
                 document.title = 'SkibCord';
-                favicon.href = "{{ url_for('static', filename='Images/hbclogo.png') }}";
+                updateFavicon();
             }
         }
 
-        // Function to change the favicon quickly
         function changeFavicon(src) {
             var link = document.getElementById('favicon');
             if (link) {
@@ -86,22 +110,20 @@
             }
         }
 
-        // Preload favicon images
         var hbclogo = new Image();
-        hbclogo.src = "{{ url_for('static', filename='Images/skibcordlogo.png') }}";
+        hbclogo.src = "{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}";
         var googleDocLogo = new Image();
         googleDocLogo.src = "{{ url_for('static', filename='Images/Google_Doc_Logo.png') }}";
 
-        // Event listener for the 'Esc' key to toggle the full-screen image
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 toggleFullScreenImage();
                 if (isHbLogo) {
                     changeFavicon("{{ url_for('static', filename='Images/Google_Doc_Logo.png') }}");
                 } else {
-                    changeFavicon("{{ url_for('static', filename='Images/hbclogo.png') }}");
+                    updateFavicon();
                 }
-                isHbLogo = !isHbLogo; // Toggle the flag
+                isHbLogo = !isHbLogo;
             }
         });
 
@@ -115,7 +137,7 @@
             if (savedScheme) {
                 setColorScheme(parseInt(savedScheme));
             } else {
-                setColorScheme(1); // Set default color scheme to 1
+                setColorScheme(1);
             }
 
             if (!username) {
@@ -167,7 +189,7 @@
                     p.appendChild(span);
                 }
                 p.appendChild(document.createTextNode(content));
-                p.classList.add('chat-message'); // Add this line to apply the chat-message class
+                p.classList.add('chat-message');
                 if (style) {
                     p.classList.add(style);
                 }
@@ -284,7 +306,7 @@
             imageInput.addEventListener('change', function(event) {
                 const file = event.target.files[0];
                 if (file) {
-                    if (file.size > 100 * 1024) { // Check if file size is greater than 100KB
+                    if (file.size > 100 * 1024) {
                         alert("Please upload images smaller than 100KB.");
                         return;
                     }
@@ -392,7 +414,6 @@
                 }, 1000);
             }
 
-            // Ensure the full-screen image is hidden on load
             document.getElementById('full-screen-image').style.display = 'none';
         });
 
@@ -408,7 +429,7 @@
         <div class="nav-title">SkibCord</div>
         <div class="username-container-nav">
             <input type="text" id="current_username_nav" class="username-display-nav" readonly>
-            <img src="{{ url_for('static', filename='Images/pen.png') }}" alt="Edit" id="edit_icon_nav">
+            <img src="{{ url_for('static', filename='Images/Pen-CS1.png') }}" alt="Edit" id="edit_icon_nav">
         </div>
     </nav>
     <div id="main-container" class="main-container">
@@ -427,7 +448,7 @@
         </div>
         <div class="sidebar" id="sidebar">
             <button class="sidebar-toggle" onclick="toggleSidebar()">
-                <img src="{{ url_for('static', filename='Images/arrow1.png') }}" alt="Toggle Sidebar">
+                <img src="{{ url_for('static', filename='Images/SidebarR-CS1.png') }}" alt="Toggle Sidebar">
             </button>
             <div class="sidebar-content">
                 <div class="sidebar-text">
