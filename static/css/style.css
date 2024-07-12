@@ -35,6 +35,7 @@ body {
     font-family: Arial, Helvetica, sans-serif;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
 }
 
 /* Top navigation bar styling */
@@ -87,6 +88,7 @@ body {
     margin-top: 60px; /* Adjust to fit below the nav bar */
     box-sizing: border-box;
     padding: 2.5%; /* Add padding around the chat container */
+    overflow: hidden;
 }
 
 /* Sidebar styling */
@@ -189,6 +191,7 @@ body {
     transition: margin-right 0.5s; /* Smooth transition for width changes */
     margin-right: 240px; /* Ensure it doesn't overlap with the sidebar */
     box-sizing: border-box;
+    overflow: hidden;
 }
 
 .sidebar-collapsed #chat-container {
