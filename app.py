@@ -13,7 +13,7 @@ from datetime import datetime
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'W0rmyOn@St1ck'
 csrf = CSRFProtect(app)
-socketio = SocketIO(app, cors_allowed_origins="*", ping_interval=10, ping_timeout=60*2, transport="websocket")
+socketio = SocketIO(app, cors_allowed_origins="*", ping_interval=10, ping_timeout=60*2)
 
 # Dictionaries for tracking sessions, usernames, and cooldowns
 session_message_times = {}
@@ -38,6 +38,9 @@ JOIN_PERIOD = 10  # Period in seconds to check for join frequency
 USERNAME_CHANGE_PERIOD = 30 * 60  # 30 minutes in seconds
 IMAGE_UPLOAD_COOLDOWN = 5 * 60  # 5 minutes in seconds
 
+# Global list to store past messages and images in order
+past_messages = []
+
 # Validate the username
 def validate_username(username):
     return bool(username) and len(username) <= 30
@@ -60,8 +63,8 @@ def resize_image(image_data):
 
 @app.route('/skibchat')
 def chat():
-    # Render the chat interface
-    return render_template('chat.html')
+    # Render the chat interface with past messages and images
+    return render_template('chat.html', past_messages=past_messages)
 
 @socketio.on('message')
 def handle_message(data):
@@ -106,7 +109,11 @@ def handle_message(data):
             emit('error', {'message': "Please don't spam, you have been put on a 5 second ban."}, broadcast=False)
             emit('message', {'username': '', 'text': f'{username} has been banned for {SPAM_BAN_PERIOD} seconds for spamming.', 'color': '#d16262'}, broadcast=True)
         else:
-            emit('message', {'username': username, 'text': message}, broadcast=True)
+            # Append message to global past_messages list
+            past_messages.append({'type': 'message', 'username': username, 'text': message, 'timestamp': current_time})
+            if len(past_messages) > 30:
+                past_messages.pop(0)
+            emit('message', {'type': 'message', 'username': username, 'text': message}, broadcast=True)
     else:
         emit('error', {'message': 'Please stay below 400 characters.'}, broadcast=False)
 
@@ -116,7 +123,7 @@ def handle_join(data):
     username = sanitize_input(data.get('username', ''))
     session_id = data.get('session_id')
     username_lower = username.lower()
-    # current_time = time.time()
+    current_time = time.time()
 
     if validate_username(username):
         if session_id not in connected_users:
@@ -202,9 +209,22 @@ def handle_image(data):
         else:
             last_image_upload[session_id] = current_time
             resized_image_data = resize_image(image_data)
-            emit('image', {'username': username, 'image': resized_image_data}, broadcast=True)
+            # Append image to global past_messages list
+            past_messages.append({'type': 'image', 'username': username, 'image': resized_image_data, 'timestamp': current_time})
+            if len(past_messages) > 30:
+                past_messages.pop(0)
+            emit('image', {'type': 'image', 'username': username, 'image': resized_image_data}, broadcast=True)
     else:
         emit('error', {'message': 'Invalid input or missing image data'}, broadcast=False)
+
+@socketio.on('clean')
+def handle_clean(data):
+    # Send all past messages to the client who requested the clean action
+    for msg in past_messages:
+        if msg['type'] == 'message':
+            emit('message', {'type': 'message', 'username': msg['username'], 'text': msg['text']}, broadcast=False)
+        elif msg['type'] == 'image':
+            emit('image', {'type': 'image', 'username': msg['username'], 'image': msg['image']}, broadcast=False)
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)
