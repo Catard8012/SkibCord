@@ -141,6 +141,24 @@ def handle_join(data):
     else:
         emit('error', {'message': 'Invalid username'}, broadcast=False)
 
+@socketio.on('rejoin')
+def handle_rejoin(data):
+    username = sanitize_input(data.get('username', ''))
+    session_id = data.get('session_id')
+    username_lower = username.lower()
+
+    if validate_username(username):
+        if username_lower not in active_usernames:
+            connected_users[session_id] = username
+            active_usernames.add(username_lower)
+            active_tabs[session_id] = 1
+
+            join_message = f'{username} has rejoined the chat'
+            emit('user joined', {'message': join_message}, broadcast=True)
+
+        emit('update user count', {'count': len(active_usernames)}, broadcast=True)
+        emit('update online users', {'users': list(active_usernames)}, broadcast=True)
+
 @socketio.on('change_username')
 def handle_change_username(data):
     # Handle username changes
