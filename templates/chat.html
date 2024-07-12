@@ -128,31 +128,18 @@
         });
 
         document.addEventListener('DOMContentLoaded', () => {
-            let username = getCookie('username');
-            let sessionId = getCookie('session_id');
-            let lastUsernameChange = getCookie('last_username_change');
-            let lastImageUpload = getCookie('last_image_upload');
-            let lastImage = getCookie('last_image');
-            const savedScheme = getCookie('color_scheme');
-            if (savedScheme) {
-                setColorScheme(parseInt(savedScheme));
-            } else {
-                setColorScheme(1);
+            let username = localStorage.getItem('username') || prompt("Please enter your username:", "Guest");
+            while (username && username.length > 30) {
+                alert("Username must be 30 characters or less.");
+                username = prompt("Please enter your username again:", "Guest");
             }
+            if (!username) username = "Guest";
+            localStorage.setItem('username', username);
 
-            if (!username) {
-                username = prompt("Please enter your username:", "Guest");
-                while (username && username.length > 30) {
-                    alert("Username must be 30 characters or less.");
-                    username = prompt("Please enter your username again:", "Guest");
-                }
-                if (!username) username = "Guest";
-                setCookie('username', username, 7);
-            }
-
+            let sessionId = localStorage.getItem('session_id');
             if (!sessionId) {
                 sessionId = generateSessionId();
-                setCookie('session_id', sessionId, 7);
+                localStorage.setItem('session_id', sessionId);
             }
 
             document.getElementById('current_username_nav').value = username;
@@ -282,7 +269,7 @@
                 if (newUsername && newUsername.length <= 30) {
                     socket.emit('change_username', { old_username: username, new_username: newUsername, session_id: sessionId });
                     username = newUsername;
-                    setCookie('username', newUsername, 7);
+                    localStorage.setItem('username', newUsername);
                     currentUsernameNav.value = newUsername;
                     setCookie('last_username_change', new Date().toISOString(), 7);
                     lastUsernameChange = new Date().toISOString();
@@ -434,6 +421,18 @@
                 socket.emit('clean', {});
                 messages.innerHTML = '';  // Clear current messages
             };
+
+            // Add event listener for Rejoin button
+            document.getElementById('rejoin_button').onclick = function() {
+                localStorage.setItem('rejoin', 'true');
+                location.reload();
+            };
+
+            // Handle rejoin
+            if (localStorage.getItem('rejoin') === 'true') {
+                localStorage.removeItem('rejoin');
+                socket.emit('rejoin', { username: username, session_id: sessionId });
+            }
         });
 
         window.addEventListener('beforeunload', function() {
@@ -445,7 +444,10 @@
 </head>
 <body>
     <nav class="top-nav">
-        <div class="nav-title">SkibCord</div>
+        <div class="nav-title">
+            SkibCord
+            <span class="version">v1.2</span>
+        </div>
         <div class="username-container-nav">
             <input type="text" id="current_username_nav" class="username-display-nav" readonly>
             <img src="{{ url_for('static', filename='Images/Pen-CS1.png') }}" alt="Edit" id="edit_icon_nav">
@@ -488,7 +490,11 @@
                         <span class="dot"></span><span class="count">0 users online</span>
                     </div>
                     <div class="sidebar-padding"></div>
-                    <div><button id="clean_button" class="theme-button">Clean</button></div>
+                    <div class="sidebar-subtitle">Actions:</div>
+                    <div class="actions-box">
+                        <button id="clean_button" class="theme-button">Clean</button>
+                        <button id="rejoin_button" class="theme-button">Rejoin</button>
+                    </div>
                 </div>
             </div>
         </div>
