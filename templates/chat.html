@@ -174,8 +174,21 @@
             let isInCooldown = false;
             let isSpinning = false;
 
+            // Function to append past messages on page load
+            function appendPastMessages() {
+                const pastMessages = {{ past_messages | tojson }};
+                pastMessages.forEach(msg => {
+                    if (msg.type === 'message') {
+                        appendMessage(msg.text, msg.username);
+                    } else if (msg.type === 'image') {
+                        appendImage(msg.image, msg.username);
+                    }
+                });
+            }
+
             function handleJoin() {
                 socket.emit('join', { username: username, session_id: sessionId, is_new_user: false });
+                appendPastMessages(); // Append past messages after joining
             }
 
             handleJoin();
@@ -306,8 +319,8 @@
             imageInput.addEventListener('change', function(event) {
                 const file = event.target.files[0];
                 if (file) {
-                    if (file.size > 100 * 1024) {
-                        alert("Please upload images smaller than 100KB.");
+                    if (file.size > 250 * 1024) {
+                        alert("Please upload images smaller than 250KB.");
                         return;
                     }
 
@@ -415,6 +428,12 @@
             }
 
             document.getElementById('full-screen-image').style.display = 'none';
+
+            // Add event listener for Clean button
+            document.getElementById('clean_button').onclick = function() {
+                socket.emit('clean', {});
+                messages.innerHTML = '';  // Clear current messages
+            };
         });
 
         window.addEventListener('beforeunload', function() {
@@ -468,6 +487,8 @@
                     <div id="online-users" class="online-users">
                         <span class="dot"></span><span class="count">0 users online</span>
                     </div>
+                    <div class="sidebar-padding"></div>
+                    <div><button id="clean_button" class="theme-button">Clean</button></div>
                 </div>
             </div>
         </div>
