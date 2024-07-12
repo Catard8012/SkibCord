@@ -14,15 +14,6 @@
     --background-color: #561F09;
 }
 
-/* Color Scheme 2 
-:root.scheme2 {
-    --main-color: pink;
-    --secondary-color: orange;
-    --text-color: white;
-    --background-color: red;
-}
-*/
-
 /* General body styling */
 body {
     background-color: var(--background-color);
@@ -35,7 +26,6 @@ body {
     font-family: Arial, Helvetica, sans-serif;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
 }
 
 /* Top navigation bar styling */
@@ -57,6 +47,14 @@ body {
     font-size: 40px;
     padding-left: 10px;
     font-family: Arial, Helvetica, sans-serif;
+    display: flex;
+    align-items: center; /* Align items vertically in the center */
+}
+
+.version {
+    font-size: 20px;
+    margin-left: 10px; /* Space between title and version */
+    color: var(--text-color);
 }
 
 /* Username container in nav styling */
@@ -88,7 +86,6 @@ body {
     margin-top: 60px; /* Adjust to fit below the nav bar */
     box-sizing: border-box;
     padding: 2.5%; /* Add padding around the chat container */
-    overflow: hidden;
 }
 
 /* Sidebar styling */
@@ -191,7 +188,6 @@ body {
     transition: margin-right 0.5s; /* Smooth transition for width changes */
     margin-right: 240px; /* Ensure it doesn't overlap with the sidebar */
     box-sizing: border-box;
-    overflow: hidden;
 }
 
 .sidebar-collapsed #chat-container {
@@ -379,6 +375,18 @@ body {
     margin-bottom: 5px;
     font-size: 14px;
     color: var(--text-color); /* Make the text white */
+}
+
+/* Actions box styling */
+.actions-box {
+    background-color: var(--main-color);
+    padding: 10px;
+    width: 168px;
+    margin-top: 10px;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
 /* Theme button styling */
