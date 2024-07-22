@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="robots" content="noindex">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" type="image/png" id="favicon" href="{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}">
     <title>SkibCord</title>
@@ -48,6 +47,7 @@
 
         function setColorScheme(scheme) {
             document.documentElement.className = scheme === 2 ? 'scheme2' : '';
+            localStorage.setItem('color_scheme', scheme);
             setCookie('color_scheme', scheme, 7);
             document.querySelectorAll('.theme-button').forEach(button => {
                 button.classList.remove('active');
@@ -59,7 +59,7 @@
 
         function updateSidebarButtonImage() {
             const toggleButton = document.querySelector('.sidebar-toggle img');
-            const colorScheme = getCookie('color_scheme') || 1;
+            const colorScheme = localStorage.getItem('color_scheme') || 1;
             if (document.getElementById('main-container').classList.contains('sidebar-collapsed')) {
                 toggleButton.src = colorScheme === '2' ? "{{ url_for('static', filename='Images/SidebarL-CS2.png') }}" : "{{ url_for('static', filename='Images/SidebarL-CS1.png') }}";
             } else {
@@ -70,12 +70,12 @@
         function updateIcons() {
             updateSidebarButtonImage();
             const editIconNav = document.querySelector('#edit_icon_nav');
-            const colorScheme = getCookie('color_scheme') || 1;
+            const colorScheme = localStorage.getItem('color_scheme') || 1;
             editIconNav.src = colorScheme === '2' ? "{{ url_for('static', filename='Images/Pen-CS2.png') }}" : "{{ url_for('static', filename='Images/Pen-CS1.png') }}";
         }
 
         function updateFavicon() {
-            const colorScheme = getCookie('color_scheme') || 1;
+            const colorScheme = localStorage.getItem('color_scheme') || 1;
             const favicon = document.getElementById('favicon');
             if (colorScheme == 2) {
                 favicon.href = "{{ url_for('static', filename='Images/Skibcordlogo-CS2.png') }}";
@@ -257,23 +257,11 @@
             }
 
             function changeUsername(newUsername) {
-                const now = new Date().getTime();
-                const thirtyMinutes = 30 * 60 * 1000;
-
-                if (lastUsernameChange && (now - new Date(lastUsernameChange).getTime()) < thirtyMinutes) {
-                    const nextChangeTime = new Date(new Date(lastUsernameChange).getTime() + thirtyMinutes);
-                    const nextChangeTimeStr = nextChangeTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    alert(`You can change your username again at ${nextChangeTimeStr}.`);
-                    return;
-                }
-
                 if (newUsername && newUsername.length <= 30) {
                     socket.emit('change_username', { old_username: username, new_username: newUsername, session_id: sessionId });
                     username = newUsername;
                     localStorage.setItem('username', newUsername);
                     currentUsernameNav.value = newUsername;
-                    setCookie('last_username_change', new Date().toISOString(), 7);
-                    lastUsernameChange = new Date().toISOString();
                 } else {
                     alert("Username must be 30 characters or less.");
                 }
@@ -289,18 +277,9 @@
             });
 
             editIconNav.onclick = () => {
-                const now = new Date().getTime();
-                const thirtyMinutes = 30 * 60 * 1000;
-
-                if (lastUsernameChange && (now - new Date(lastUsernameChange).getTime()) < thirtyMinutes) {
-                    const nextChangeTime = new Date(new Date(lastUsernameChange).getTime() + thirtyMinutes);
-                    const nextChangeTimeStr = nextChangeTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    alert(`You can change your username again at ${nextChangeTimeStr}.`);
-                } else {
-                    const newUsername = prompt("Enter new username:", username);
-                    if (newUsername !== null) {
-                        changeUsername(newUsername);
-                    }
+                const newUsername = prompt("Enter new username:", username);
+                if (newUsername !== null) {
+                    changeUsername(newUsername);
                 }
             };
 
@@ -345,10 +324,6 @@
             });
 
             socket.on('user joined', function(data) {
-                appendMessage(data.message, '', 'system-message');
-            });
-
-            socket.on('user left', function(data) {
                 appendMessage(data.message, '', 'system-message');
             });
 
@@ -417,16 +392,12 @@
 
             document.getElementById('full-screen-image').style.display = 'none';
 
-            // Add event listener for Clean button
-            document.getElementById('clean_button').onclick = function() {
-                socket.emit('clean', {});
-                messages.innerHTML = '';  // Clear current messages
-            };
-
             // Add event listener for Rejoin button
             document.getElementById('rejoin_button').onclick = function() {
+                const savedScheme = localStorage.getItem('color_scheme') || 1;
                 localStorage.setItem('rejoin', 'true');
                 location.reload();
+                setColorScheme(savedScheme);
             };
 
             // Handle rejoin
@@ -434,6 +405,19 @@
                 localStorage.removeItem('rejoin');
                 socket.emit('rejoin', { username: username, session_id: sessionId });
             }
+
+            // Set the saved color scheme or default to scheme 1
+            const savedScheme = localStorage.getItem('color_scheme') || 1;
+            setColorScheme(savedScheme);
+
+            // Emit focus and blur events
+            window.addEventListener('focus', () => {
+                socket.emit('focus', { username: username, session_id: sessionId });
+            });
+
+            window.addEventListener('blur', () => {
+                socket.emit('blur', { username: username, session_id: sessionId });
+            });
         });
 
         window.addEventListener('beforeunload', function() {
@@ -493,7 +477,6 @@
                     <div class="sidebar-padding"></div>
                     <div class="sidebar-subtitle">Actions:</div>
                     <div class="actions-box">
-                        <button id="clean_button" class="theme-button">Clean</button>
                         <button id="rejoin_button" class="theme-button">Rejoin</button>
                     </div>
                 </div>
