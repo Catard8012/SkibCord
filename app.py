@@ -133,31 +133,35 @@ def handle_join(data):
 
             join_message = f'{username} has joined the chat'
             emit('user joined', {'message': join_message}, broadcast=True)
-        else:
-            active_tabs[session_id] += 1
 
         emit('update user count', {'count': len(active_usernames)}, broadcast=True)
         emit('update online users', {'users': list(active_usernames)}, broadcast=True)
     else:
         emit('error', {'message': 'Invalid username'}, broadcast=False)
 
-@socketio.on('rejoin')
-def handle_rejoin(data):
+@socketio.on('focus')
+def handle_focus(data):
     username = sanitize_input(data.get('username', ''))
     session_id = data.get('session_id')
     username_lower = username.lower()
 
     if validate_username(username):
         if username_lower not in active_usernames:
-            connected_users[session_id] = username
             active_usernames.add(username_lower)
-            active_tabs[session_id] = 1
+            emit('update user count', {'count': len(active_usernames)}, broadcast=True)
+            emit('update online users', {'users': list(active_usernames)}, broadcast=True)
 
-            join_message = f'{username} has rejoined the chat'
-            emit('user joined', {'message': join_message}, broadcast=True)
+@socketio.on('blur')
+def handle_blur(data):
+    username = sanitize_input(data.get('username', ''))
+    session_id = data.get('session_id')
+    username_lower = username.lower()
 
-        emit('update user count', {'count': len(active_usernames)}, broadcast=True)
-        emit('update online users', {'users': list(active_usernames)}, broadcast=True)
+    if validate_username(username):
+        if username_lower in active_usernames:
+            active_usernames.remove(username_lower)
+            emit('update user count', {'count': len(active_usernames)}, broadcast=True)
+            emit('update online users', {'users': list(active_usernames)}, broadcast=True)
 
 @socketio.on('change_username')
 def handle_change_username(data):
@@ -166,29 +170,18 @@ def handle_change_username(data):
     new_username = sanitize_input(data.get('new_username', ''))
     session_id = data.get('session_id')
     new_username_lower = new_username.lower()
-    current_time = time.time()
 
     if validate_username(new_username):
-        # Check if enough time has passed since the last username change
-        if session_id in last_username_change and (current_time - last_username_change[session_id] < USERNAME_CHANGE_PERIOD):
-            next_change_time = datetime.fromtimestamp(last_username_change[session_id] + USERNAME_CHANGE_PERIOD)
-            next_change_time_str = next_change_time.strftime('%I:%M %p').lstrip('0')
-            emit('error', {'message': f"You can change your username again at {next_change_time_str}."}, broadcast=False)
-            return
-
         if new_username_lower in active_usernames:
             emit('error', {'message': 'Username already taken'}, broadcast=False)
         else:
             # Remove old username and add new username
-            active_usernames.remove(old_username.lower())
+            active_usernames.discard(old_username.lower())
             active_usernames.add(new_username_lower)
             connected_users[session_id] = new_username
 
             # Emit username change message
             emit('username_changed', {'old_username': old_username, 'new_username': new_username}, broadcast=True)
-            
-            # Update the last username change time
-            last_username_change[session_id] = current_time
             
             # Update user count without emitting join message again
             emit('update user count', {'count': len(active_usernames)}, broadcast=True)
@@ -206,8 +199,6 @@ def handle_disconnect():
             username = connected_users.pop(session_id, None)
             if username and username.lower() in active_usernames:
                 active_usernames.remove(username.lower())
-                leave_message = f'{username} has left the chat'
-                emit('user left', {'message': leave_message}, broadcast=True)
                 emit('update user count', {'count': len(active_usernames)}, broadcast=True)
                 emit('update online users', {'users': list(active_usernames)}, broadcast=True)
 
