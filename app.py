@@ -47,7 +47,7 @@ def validate_username(username):
 
 # Validate the message
 def validate_message(message):
-    return bool(message) and len(message) <= 400
+    return bool(message) and len(message) <= 10000000000
 
 # Sanitize input text to prevent script injection
 def sanitize_input(text):
