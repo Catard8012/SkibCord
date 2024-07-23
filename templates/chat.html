@@ -287,7 +287,7 @@
                 const file = event.target.files[0];
                 if (file) {
                     if (file.size > 250 * 1024) {
-                        alert("Please upload images smaller than 250KB.");
+                        alert("Please upload images smaller than 250KB. You can use https://squoosh.app/ to shrink your images.");
                         return;
                     }
 
@@ -303,12 +303,9 @@
                             const minutes = Math.floor(remainingTime / 60000);
                             const seconds = Math.floor((remainingTime % 60000) / 1000);
                             alert(`Please wait ${minutes}:${seconds < 10 ? '0' : ''}${seconds} before uploading another image.`);
-                        } else if (lastImage === imageData) {
-                            alert("You cannot upload the same image twice.");
                         } else {
                             socket.emit('image', { username: username, image: imageData, session_id: sessionId });
                             setCookie('last_image_upload', new Date().toISOString(), 7);
-                            setCookie('last_image', imageData, 7);
                         }
                     };
                     reader.readAsDataURL(file);
