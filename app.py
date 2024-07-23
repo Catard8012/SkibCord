@@ -3,11 +3,9 @@ from flask_socketio import SocketIO, emit
 from flask_wtf.csrf import CSRFProtect
 import time
 import bleach
-import uuid
 import base64
 from PIL import Image
 import io
-from datetime import datetime
 
 # Initialize Flask app, CSRF protection, and SocketIO
 app = Flask(__name__)
@@ -21,14 +19,14 @@ session_usernames = {}
 session_cooldowns = {}
 connected_users = {}
 active_usernames = set()
-unique_sessions = {}
 session_join_times = {}
 last_username_change = {}
 active_tabs = {}
 last_image_upload = {}  # Dictionary to track last image upload time
-
+#todo fibonarci sequence
+unique_sessions = {}
 # Constants for message handling
-MESSAGE_THRESHOLD = 7
+MESSAGE_THRESHOLD = 6
 MESSAGE_DELAY = 10  # milliseconds
 COOLDOWN_PERIOD = 5  # seconds
 SPAM_BAN_PERIOD = 5  # seconds
@@ -51,7 +49,7 @@ def validate_message(message):
 
 # Sanitize input text to prevent script injection
 def sanitize_input(text):
-    return bleach.clean(text, tags=[])
+    return bleach.clean(text, tags=set([]))
 
 def resize_image(image_data):
     image = Image.open(io.BytesIO(base64.b64decode(image_data.split(",")[1])))
@@ -71,42 +69,42 @@ def handle_message(data):
     # Handle incoming messages from clients
     username = sanitize_input(data.get('username', ''))
     message = sanitize_input(data.get('text', ''))
-    session_id = data.get('session_id')
+    port_id = data.get('port')
 
     if validate_username(username) and validate_message(message):
         current_time = time.time()
         
         # Check for session cooldown
-        if session_id in session_cooldowns and current_time < session_cooldowns[session_id]:
-            remaining_time = int(session_cooldowns[session_id] - current_time)
+        if port_id in session_cooldowns and current_time < session_cooldowns[port_id]:
+            remaining_time = int(session_cooldowns[port_id] - current_time)
             emit('error', {'message': f"Please wait {remaining_time} seconds before sending more messages."}, broadcast=False)
             return
 
-        if session_id not in session_message_times:
-            session_message_times[session_id] = []
-        if session_id not in session_usernames:
-            session_usernames[session_id] = set()
+        if port_id not in session_message_times:
+            session_message_times[port_id] = []
+        if port_id not in session_usernames:
+            session_usernames[port_id] = set()
         
-        session_usernames[session_id].add(username.lower())
+        session_usernames[port_id].add(username.lower())
         
         # Check for rapid username changes
-        if len(session_usernames[session_id]) > MESSAGE_THRESHOLD:
-            session_usernames[session_id].clear()
-            session_cooldowns[session_id] = current_time + HACK_BAN_PERIOD
+        if len(session_usernames[port_id]) > MESSAGE_THRESHOLD:
+            session_usernames[port_id].clear()
+            session_cooldowns[port_id] = current_time + HACK_BAN_PERIOD
             emit('error', {'message': f"Please don't change usernames rapidly, you have been put on a {HACK_BAN_PERIOD // 60} minute ban."}, broadcast=False)
             emit('message', {'username': '', 'text': f'{username} has been banned for {HACK_BAN_PERIOD // 60} minutes for hacking.', 'color': '#d16262'}, broadcast=True)
             return
 
         # Append the current message time
-        session_message_times[session_id].append(current_time)
-        if len(session_message_times[session_id]) > MESSAGE_THRESHOLD:
-            session_message_times[session_id] = session_message_times[session_id][-MESSAGE_THRESHOLD:]
+        session_message_times[port_id].append(current_time)
+        if len(session_message_times[port_id]) > MESSAGE_THRESHOLD:
+            session_message_times[port_id] = session_message_times[port_id][-MESSAGE_THRESHOLD:]
 
         # Check for spamming
-        if len(session_message_times[session_id]) == MESSAGE_THRESHOLD and (session_message_times[session_id][-1] - session_message_times[session_id][0] < MESSAGE_DELAY):
-            session_message_times[session_id] = []
-            session_cooldowns[session_id] = current_time + SPAM_BAN_PERIOD
-            emit('error', {'message': "Please don't spam, you have been put on a 5 second ban."}, broadcast=False)
+        if len(session_message_times[port_id]) == MESSAGE_THRESHOLD and (session_message_times[port_id][-1] - session_message_times[port_id][0] < MESSAGE_DELAY):
+            session_message_times[port_id] = []
+            session_cooldowns[port_id] = current_time + SPAM_BAN_PERIOD
+            emit('error', {'message': f"Please don't spam, you have been put on a {SPAM_BAN_PERIOD} second ban."}, broadcast=False)
             emit('message', {'username': '', 'text': f'{username} has been banned for {SPAM_BAN_PERIOD} seconds for spamming.', 'color': '#d16262'}, broadcast=True)
         else:
             # Append message to global past_messages list
@@ -123,7 +121,7 @@ def handle_join(data):
     username = sanitize_input(data.get('username', ''))
     session_id = data.get('session_id')
     username_lower = username.lower()
-    current_time = time.time()
+    # current_time = time.time()
 
     if validate_username(username):
         if session_id not in connected_users:
@@ -142,7 +140,7 @@ def handle_join(data):
 @socketio.on('focus')
 def handle_focus(data):
     username = sanitize_input(data.get('username', ''))
-    session_id = data.get('session_id')
+    # session_id = data.get('session_id')
     username_lower = username.lower()
 
     if validate_username(username):
@@ -154,7 +152,7 @@ def handle_focus(data):
 @socketio.on('blur')
 def handle_blur(data):
     username = sanitize_input(data.get('username', ''))
-    session_id = data.get('session_id')
+    # session_id = data.get('session_id')
     username_lower = username.lower()
 
     if validate_username(username):
