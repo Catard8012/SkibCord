@@ -69,41 +69,41 @@ def handle_message(data):
     # Handle incoming messages from clients
     username = sanitize_input(data.get('username', ''))
     message = sanitize_input(data.get('text', ''))
-    port_id = data.get('port')
+    ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
 
     if validate_username(username) and validate_message(message):
         current_time = time.time()
         
         # Check for session cooldown
-        if port_id in session_cooldowns and current_time < session_cooldowns[port_id]:
-            remaining_time = int(session_cooldowns[port_id] - current_time)
+        if ip_id in session_cooldowns and current_time < session_cooldowns[ip_id]:
+            remaining_time = int(session_cooldowns[ip_id] - current_time)
             emit('error', {'message': f"Please wait {remaining_time} seconds before sending more messages."}, broadcast=False)
             return
 
-        if port_id not in session_message_times:
-            session_message_times[port_id] = []
-        if port_id not in session_usernames:
-            session_usernames[port_id] = set()
+        if ip_id not in session_message_times:
+            session_message_times[ip_id] = []
+        if ip_id not in session_usernames:
+            session_usernames[ip_id] = set()
         
-        session_usernames[port_id].add(username.lower())
+        session_usernames[ip_id].add(username.lower())
         
         # Check for rapid username changes
-        if len(session_usernames[port_id]) > MESSAGE_THRESHOLD:
-            session_usernames[port_id].clear()
-            session_cooldowns[port_id] = current_time + HACK_BAN_PERIOD
+        if len(session_usernames[ip_id]) > MESSAGE_THRESHOLD:
+            session_usernames[ip_id].clear()
+            session_cooldowns[ip_id] = current_time + HACK_BAN_PERIOD
             emit('error', {'message': f"Please don't change usernames rapidly, you have been put on a {HACK_BAN_PERIOD // 60} minute ban."}, broadcast=False)
             emit('message', {'username': '', 'text': f'{username} has been banned for {HACK_BAN_PERIOD // 60} minutes for hacking.', 'color': '#d16262'}, broadcast=True)
             return
 
         # Append the current message time
-        session_message_times[port_id].append(current_time)
-        if len(session_message_times[port_id]) > MESSAGE_THRESHOLD:
-            session_message_times[port_id] = session_message_times[port_id][-MESSAGE_THRESHOLD:]
+        session_message_times[ip_id].append(current_time)
+        if len(session_message_times[ip_id]) > MESSAGE_THRESHOLD:
+            session_message_times[ip_id] = session_message_times[ip_id][-MESSAGE_THRESHOLD:]
 
         # Check for spamming
-        if len(session_message_times[port_id]) == MESSAGE_THRESHOLD and (session_message_times[port_id][-1] - session_message_times[port_id][0] < MESSAGE_DELAY):
-            session_message_times[port_id] = []
-            session_cooldowns[port_id] = current_time + SPAM_BAN_PERIOD
+        if len(session_message_times[ip_id]) == MESSAGE_THRESHOLD and (session_message_times[ip_id][-1] - session_message_times[ip_id][0] < MESSAGE_DELAY):
+            session_message_times[ip_id] = []
+            session_cooldowns[ip_id] = current_time + SPAM_BAN_PERIOD
             emit('error', {'message': f"Please don't spam, you have been put on a {SPAM_BAN_PERIOD} second ban."}, broadcast=False)
             emit('message', {'username': '', 'text': f'{username} has been banned for {SPAM_BAN_PERIOD} seconds for spamming.', 'color': '#d16262'}, broadcast=True)
         else:
@@ -119,15 +119,15 @@ def handle_message(data):
 def handle_join(data):
     # Handle new users joining the chat
     username = sanitize_input(data.get('username', ''))
-    session_id = data.get('session_id')
+    ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
     username_lower = username.lower()
     # current_time = time.time()
 
     if validate_username(username):
-        if session_id not in connected_users:
-            connected_users[session_id] = username
+        if ip_id not in connected_users:
+            connected_users[ip_id] = username
             active_usernames.add(username_lower)
-            active_tabs[session_id] = 1
+            active_tabs[ip_id] = 1
 
             join_message = f'{username} has joined the chat'
             emit('user joined', {'message': join_message}, broadcast=True)
@@ -140,7 +140,6 @@ def handle_join(data):
 @socketio.on('focus')
 def handle_focus(data):
     username = sanitize_input(data.get('username', ''))
-    # session_id = data.get('session_id')
     username_lower = username.lower()
 
     if validate_username(username):
@@ -152,7 +151,6 @@ def handle_focus(data):
 @socketio.on('blur')
 def handle_blur(data):
     username = sanitize_input(data.get('username', ''))
-    # session_id = data.get('session_id')
     username_lower = username.lower()
 
     if validate_username(username):
@@ -166,7 +164,7 @@ def handle_change_username(data):
     # Handle username changes
     old_username = sanitize_input(data.get('old_username', ''))
     new_username = sanitize_input(data.get('new_username', ''))
-    session_id = data.get('session_id')
+    ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
     new_username_lower = new_username.lower()
 
     if validate_username(new_username):
@@ -176,7 +174,7 @@ def handle_change_username(data):
             # Remove old username and add new username
             active_usernames.discard(old_username.lower())
             active_usernames.add(new_username_lower)
-            connected_users[session_id] = new_username
+            connected_users[ip_id] = new_username
 
             # Emit username change message
             emit('username_changed', {'old_username': old_username, 'new_username': new_username}, broadcast=True)
@@ -191,10 +189,11 @@ def handle_change_username(data):
 def handle_disconnect():
     # Handle user disconnection
     session_id = request.cookies.get('session_id')
-    if session_id in active_tabs:
-        active_tabs[session_id] -= 1
-        if active_tabs[session_id] == 0:
-            username = connected_users.pop(session_id, None)
+    ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
+    if ip_id in active_tabs:
+        active_tabs[ip_id] -= 1
+        if active_tabs[ip_id] == 0:
+            username = connected_users.pop(ip_id, None)
             if username and username.lower() in active_usernames:
                 active_usernames.remove(username.lower())
                 emit('update user count', {'count': len(active_usernames)}, broadcast=True)
@@ -204,17 +203,17 @@ def handle_disconnect():
 def handle_image(data):
     username = sanitize_input(data.get('username', ''))
     image_data = data.get('image')
-    session_id = data.get('session_id')
+    ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
     current_time = time.time()
 
     if validate_username(username) and image_data:
         # Check if the user has uploaded an image within the last 5 minutes
-        if session_id in last_image_upload and (current_time - last_image_upload[session_id] < IMAGE_UPLOAD_COOLDOWN):
-            remaining_time = int(IMAGE_UPLOAD_COOLDOWN - (current_time - last_image_upload[session_id]))
+        if ip_id in last_image_upload and (current_time - last_image_upload[ip_id] < IMAGE_UPLOAD_COOLDOWN):
+            remaining_time = int(IMAGE_UPLOAD_COOLDOWN - (current_time - last_image_upload[ip_id]))
             minutes, seconds = divmod(remaining_time, 60)
             emit('error', {'message': f"Please wait {minutes}:{seconds:02d} before uploading another image."}, broadcast=False)
         else:
-            last_image_upload[session_id] = current_time
+            last_image_upload[ip_id] = current_time
             resized_image_data = resize_image(image_data)
             # Append image to global past_messages list
             past_messages.append({'type': 'image', 'username': username, 'image': resized_image_data, 'timestamp': current_time})
