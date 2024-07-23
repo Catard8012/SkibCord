@@ -119,15 +119,15 @@ def handle_message(data):
 def handle_join(data):
     # Handle new users joining the chat
     username = sanitize_input(data.get('username', ''))
-    session_id = data.get('session_id')
+    port_id = data.get('port')
     username_lower = username.lower()
     # current_time = time.time()
 
     if validate_username(username):
-        if session_id not in connected_users:
-            connected_users[session_id] = username
+        if port_id not in connected_users:
+            connected_users[port_id] = username
             active_usernames.add(username_lower)
-            active_tabs[session_id] = 1
+            active_tabs[port_id] = 1
 
             join_message = f'{username} has joined the chat'
             emit('user joined', {'message': join_message}, broadcast=True)
@@ -140,7 +140,7 @@ def handle_join(data):
 @socketio.on('focus')
 def handle_focus(data):
     username = sanitize_input(data.get('username', ''))
-    # session_id = data.get('session_id')
+    # port_id = data.get('port')
     username_lower = username.lower()
 
     if validate_username(username):
@@ -152,7 +152,7 @@ def handle_focus(data):
 @socketio.on('blur')
 def handle_blur(data):
     username = sanitize_input(data.get('username', ''))
-    # session_id = data.get('session_id')
+    # port_id = data.get('port')
     username_lower = username.lower()
 
     if validate_username(username):
@@ -166,7 +166,7 @@ def handle_change_username(data):
     # Handle username changes
     old_username = sanitize_input(data.get('old_username', ''))
     new_username = sanitize_input(data.get('new_username', ''))
-    session_id = data.get('session_id')
+    port_id = data.get('port')
     new_username_lower = new_username.lower()
 
     if validate_username(new_username):
@@ -176,7 +176,7 @@ def handle_change_username(data):
             # Remove old username and add new username
             active_usernames.discard(old_username.lower())
             active_usernames.add(new_username_lower)
-            connected_users[session_id] = new_username
+            connected_users[port_id] = new_username
 
             # Emit username change message
             emit('username_changed', {'old_username': old_username, 'new_username': new_username}, broadcast=True)
@@ -188,13 +188,14 @@ def handle_change_username(data):
         emit('error', {'message': 'Invalid username'}, broadcast=False)
 
 @socketio.on('disconnect')
-def handle_disconnect():
+def handle_disconnect(data):
     # Handle user disconnection
-    session_id = request.cookies.get('session_id')
-    if session_id in active_tabs:
-        active_tabs[session_id] -= 1
-        if active_tabs[session_id] == 0:
-            username = connected_users.pop(session_id, None)
+    port_id = data.get('port')
+    # session_id = request.cookies.get('session_id')
+    if port_id in active_tabs:
+        active_tabs[port_id] -= 1
+        if active_tabs[port_id] == 0:
+            username = connected_users.pop(port_id, None)
             if username and username.lower() in active_usernames:
                 active_usernames.remove(username.lower())
                 emit('update user count', {'count': len(active_usernames)}, broadcast=True)
@@ -204,17 +205,17 @@ def handle_disconnect():
 def handle_image(data):
     username = sanitize_input(data.get('username', ''))
     image_data = data.get('image')
-    session_id = data.get('session_id')
+    port_id = data.get('port')
     current_time = time.time()
 
     if validate_username(username) and image_data:
         # Check if the user has uploaded an image within the last 5 minutes
-        if session_id in last_image_upload and (current_time - last_image_upload[session_id] < IMAGE_UPLOAD_COOLDOWN):
-            remaining_time = int(IMAGE_UPLOAD_COOLDOWN - (current_time - last_image_upload[session_id]))
+        if port_id in last_image_upload and (current_time - last_image_upload[port_id] < IMAGE_UPLOAD_COOLDOWN):
+            remaining_time = int(IMAGE_UPLOAD_COOLDOWN - (current_time - last_image_upload[port_id]))
             minutes, seconds = divmod(remaining_time, 60)
             emit('error', {'message': f"Please wait {minutes}:{seconds:02d} before uploading another image."}, broadcast=False)
         else:
-            last_image_upload[session_id] = current_time
+            last_image_upload[port_id] = current_time
             resized_image_data = resize_image(image_data)
             # Append image to global past_messages list
             past_messages.append({'type': 'image', 'username': username, 'image': resized_image_data, 'timestamp': current_time})
