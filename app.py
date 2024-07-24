@@ -135,6 +135,11 @@ def resize_image(image_data):
     resized_image_data = base64.b64encode(buffered.getvalue()).decode('utf-8')
     return f"data:image/png;base64,{resized_image_data}"
 
+@app.route('/')
+def fake():
+    # Render the chat interface with past messages and images
+    return "This site is under construction. We plan to add maths articles intended for school students."
+    
 @app.route('/skibchat')
 def chat():
     # Render the chat interface with past messages and images
