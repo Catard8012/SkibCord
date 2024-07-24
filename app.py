@@ -5,7 +5,7 @@ import time
 import bleach
 import base64
 from PIL import Image
-import io
+import io, re
 
 # Initialize Flask app, CSRF protection, and SocketIO
 app = Flask(__name__)
@@ -39,12 +39,88 @@ IMAGE_UPLOAD_COOLDOWN = 5 * 60  # 5 minutes in seconds
 # Global list to store past messages and images in order
 past_messages = []
 
+
+# list of word replacements, words-to-replace are seperated by " / "
+# not case sensitive
+naughtyWords = {
+    "balderdash": "fuk / phuck",
+    "bindlestiff": "clitoris",
+    "bologne": "basterd",
+    "bosom": "boobs / tits / titty",
+    "bosoms": "boobies / titties",
+    "breeches": "muff / nutsack / scrotum",
+    "bumfuzzle": "dumbass",
+    "carbuncle": "jackass",
+    "cheese and crackers": "motherf*cker, motherf*cking",
+    "child born out of wedlock": "bastard",
+    "codswallop": "douche / douchebag",
+    "curmudgeon": "boner",
+    "dagnabbit": "cocksucker / sh*t, sht / fcuk",
+    "doodle": "cock / dick / penis",
+    "escort": "whore",
+    "fellmonger": "prick / wank",
+    "flummery": "cum / semen / shit",
+    "fopdoodle": "Hitier / Hitler / Moonman / M o o n m a n / Stalin",
+    "fusty": "jizz",
+    "gardyloo": "orgasm / thatass",
+    "gee golly": "damn / damnit",
+    "hard worker": "slave",
+    "harlot": "dyke / kunt[Note 1] / nympho / skank / slut / tramp / twat / whore",
+    "kick the bucket": "kys / kill yourself",
+    "kitty": "pussy",
+    "lord almighty": "Allah Ackbar",
+    "malarky": "queef / porn",
+    "mumblecrusted": "fisted",
+    "mumblecrusting": "fisting",
+    "nonbinary": "homo / transexual",
+    "petticoat": "dildo",
+    "pillion": "anal / anus / ass / asshole",
+    "pillions": "asses",
+    "plague": "herpes / hiv / std",
+    "plant a flower": "suck it / suck me off",
+    "premarital relations": "blowjob / fellatio / handjob / rimjob",
+    "prithee transport thyself to tarnation": "go to hell",
+    "pumpkin pie": "creampie",
+    "raggabrash": "kkk",
+    "rascal": "scumbag",
+    "rigamole": "bukkake",
+    "rose": "vagina",
+    "rosebud": "clit",
+    "savant": "autistic / retarded",
+    "snap crackle pop": "bitch / b*tch / biatch",
+    "something": "blow job",
+    "son of a gun": "bullshit",
+    "tell me more": "stfu",
+    "tarnation": "fuck / fucked / fucker / fucking",
+    "townie": "nazi",
+    "yaldson": "anilingus",
+    "you are a great player": "you suck",
+    "you are an amazing player": "you are garbage / you're garbage / you are trash / you're trash",
+    "you are an upstanding citizen": "you are gay / you're gay",
+    "zounderkite": "retard",
+    }
+
 # Validate the username
 def validate_username(username):
     return bool(username) and len(username) <= 30
 
+# Replaces instances of naughty words with alternatives based on the given dictionary 
+def filter_message(message):
+    cleanMessage = message
+    for word in naughtyWords:
+        badwords = naughtyWords[word]
+
+        for badword in badwords.split(" / "):
+
+            replacement_word = word
+            bad_word = badword.lower()
+
+            cleanMessage = re.sub(r"( |\b)"+bad_word+r"( |\b)", " "+replacement_word+" ", cleanMessage)
+
+    return cleanMessage
+
 # Validate the message
-def validate_message(message):
+def validate_message(message):    
     return bool(message) and len(message) <= 400
 
 # Sanitize input text to prevent script injection
@@ -70,6 +146,9 @@ def handle_message(data):
     username = sanitize_input(data.get('username', ''))
     message = sanitize_input(data.get('text', ''))
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
+    
+    message = filter_message(message)
+
 
     if validate_username(username) and validate_message(message):
         current_time = time.time()
