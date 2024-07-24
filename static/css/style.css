@@ -86,6 +86,7 @@ body {
     margin-top: 60px; /* Adjust to fit below the nav bar */
     box-sizing: border-box;
     padding: 2.5%; /* Add padding around the chat container */
+    overflow-y: auto; 
 }
 
 /* Sidebar styling */
