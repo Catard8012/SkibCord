@@ -23,8 +23,10 @@ session_join_times = {}
 last_username_change = {}
 active_tabs = {}
 last_image_upload = {}  # Dictionary to track last image upload time
+
 #todo fibonarci sequence
 unique_sessions = {}
+
 # Constants for message handling
 MESSAGE_THRESHOLD = 6
 MESSAGE_DELAY = 10  # milliseconds
@@ -38,7 +40,6 @@ IMAGE_UPLOAD_COOLDOWN = 5 * 60  # 5 minutes in seconds
 
 # Global list to store past messages and images in order
 past_messages = []
-
 
 # list of word replacements, words-to-replace are seperated by " / "
 # not case sensitive
