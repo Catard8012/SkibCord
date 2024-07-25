@@ -69,6 +69,7 @@ naughtyWords = {
     "hard worker": "slave",
     "cutie": "cunt",
     "nincompoop": "nigger / nigga / negro / negroe / jiggerboo / jiggaboo / coon", 
+    "nincompoops": "niggers / niggas / negros / negroes / jiggerboos / jiggaboos / coons", 
     "harlot": "dyke / kunt[Note 1] / nympho / skank / slut / tramp / twat / whore",
     "kick the bucket": "kys / kill yourself",
     "kitty": "pussy",
