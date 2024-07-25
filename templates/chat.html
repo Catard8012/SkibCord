@@ -174,12 +174,15 @@
                 });
             }
 
-            function handleJoin() {
-                socket.emit('join', { username: username, session_id: sessionId, is_new_user: false });
+            function handleJoin(isNewUser) {
+                socket.emit('join', { username: username, session_id: sessionId, is_new_user: isNewUser });
                 appendPastMessages(); // Append past messages after joining
             }
 
-            handleJoin();
+            // Check if the user is new or returning
+            const isNewUser = !sessionStorage.getItem('joined');
+            sessionStorage.setItem('joined', 'true');
+            handleJoin(isNewUser);
 
             function appendMessage(content, username = '', style = '') {
                 const p = document.createElement('p');
@@ -286,8 +289,8 @@
             imageInput.addEventListener('change', function(event) {
                 const file = event.target.files[0];
                 if (file) {
-                    if (file.size > 250 * 1024) {
-                        alert("Please upload images smaller than 250KB. You can use https://squoosh.app/ to shrink your images.");
+                    if (file.size > 1024 * 1024) {
+                        alert("Please upload images smaller than 1MB. You can use https://squoosh.app/ to shrink your images.");
                         return;
                     }
 
@@ -296,10 +299,10 @@
                         const imageData = e.target.result;
                         const now = new Date().getTime();
                         const lastImageUploadTime = getCookie('last_image_upload');
-                        const fiveMinutes = 5 * 60 * 1000;
+                        const oneMinute = 60 * 1000;
 
-                        if (lastImageUploadTime && (now - new Date(lastImageUploadTime).getTime()) < fiveMinutes) {
-                            const remainingTime = fiveMinutes - (now - new Date(lastImageUploadTime).getTime());
+                        if (lastImageUploadTime && (now - new Date(lastImageUploadTime).getTime()) < oneMinute) {
+                            const remainingTime = oneMinute - (now - new Date(lastImageUploadTime).getTime());
                             const minutes = Math.floor(remainingTime / 60000);
                             const seconds = Math.floor((remainingTime % 60000) / 1000);
                             alert(`Please wait ${minutes}:${seconds < 10 ? '0' : ''}${seconds} before uploading another image.`);
