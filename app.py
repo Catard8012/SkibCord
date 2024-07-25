@@ -24,9 +24,6 @@ last_username_change = {}
 active_tabs = {}
 last_image_upload = {}  # Dictionary to track last image upload time
 
-#todo fibonarci sequence
-unique_sessions = {}
-
 # Constants for message handling
 MESSAGE_THRESHOLD = 6
 MESSAGE_DELAY = 10  # milliseconds
@@ -35,14 +32,13 @@ SPAM_BAN_PERIOD = 5  # seconds
 HACK_BAN_PERIOD = 5 * 60  # seconds
 JOIN_THRESHOLD = 7  # Number of joins within the period to trigger ban
 JOIN_PERIOD = 10  # Period in seconds to check for join frequency
-USERNAME_CHANGE_PERIOD = 30 * 60  # 30 minutes in seconds
-IMAGE_UPLOAD_COOLDOWN = 5 * 60  # 5 minutes in seconds
+USERNAME_CHANGE_PERIOD = 60  # 1 minute in seconds
+IMAGE_UPLOAD_COOLDOWN = 60  # 1 minute in seconds
 
 # Global list to store past messages and images in order
 past_messages = []
 
-# list of word replacements, words-to-replace are seperated by " / "
-# not case sensitive
+# List of word replacements, words-to-replace are separated by " / "
 naughtyWords = {
     "balderdash": "fuk / phuck",
     "bindlestiff": "clitoris",
@@ -134,11 +130,14 @@ def sanitize_input(text):
 
 def resize_image(image_data):
     image = Image.open(io.BytesIO(base64.b64decode(image_data.split(",")[1])))
-    image = image.resize((200, 200))
-    buffered = io.BytesIO()
-    image.save(buffered, format="PNG")
-    resized_image_data = base64.b64encode(buffered.getvalue()).decode('utf-8')
-    return f"data:image/png;base64,{resized_image_data}"
+    if image.format == 'GIF':
+        return image_data  # Skip resizing for GIFs to keep animations
+    else:
+        image = image.resize((200, 200))
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+        resized_image_data = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{resized_image_data}"
 
 @app.route('/')
 def fake():
@@ -158,7 +157,6 @@ def handle_message(data):
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
     
     message = filter_message(message)
-
 
     if validate_username(username) and validate_message(message):
         current_time = time.time()
@@ -209,8 +207,8 @@ def handle_join(data):
     # Handle new users joining the chat
     username = sanitize_input(data.get('username', ''))
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
-    username_lower = username.lower()
-    # current_time = time.time()
+    username_lower = filter_message(username.lower())
+    current_time = time.time()
 
     if validate_username(username):
         if ip_id not in connected_users:
@@ -218,8 +216,10 @@ def handle_join(data):
             active_usernames.add(username_lower)
             active_tabs[ip_id] = 1
 
-            join_message = f'{username} has joined the chat'
-            emit('user joined', {'message': join_message}, broadcast=True)
+            # Check if user is new or returning
+            if data.get('is_new_user', True):
+                join_message = f'{username} has joined the chat'
+                emit('user joined', {'message': join_message}, broadcast=True)
 
         emit('update user count', {'count': len(active_usernames)}, broadcast=True)
         emit('update online users', {'users': list(active_usernames)}, broadcast=True)
@@ -229,7 +229,7 @@ def handle_join(data):
 @socketio.on('focus')
 def handle_focus(data):
     username = sanitize_input(data.get('username', ''))
-    username_lower = username.lower()
+    username_lower = filter_message(username.lower())
 
     if validate_username(username):
         if username_lower not in active_usernames:
@@ -240,7 +240,7 @@ def handle_focus(data):
 @socketio.on('blur')
 def handle_blur(data):
     username = sanitize_input(data.get('username', ''))
-    username_lower = username.lower()
+    username_lower = filter_message(username.lower())
 
     if validate_username(username):
         if username_lower in active_usernames:
@@ -254,23 +254,30 @@ def handle_change_username(data):
     old_username = sanitize_input(data.get('old_username', ''))
     new_username = sanitize_input(data.get('new_username', ''))
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
-    new_username_lower = new_username.lower()
+    new_username_lower = filter_message(new_username.lower())
+    current_time = time.time()
 
     if validate_username(new_username):
-        if new_username_lower in active_usernames:
-            emit('error', {'message': 'Username already taken'}, broadcast=False)
+        # Check for username change cooldown
+        if ip_id in last_username_change and (current_time - last_username_change[ip_id] < USERNAME_CHANGE_PERIOD):
+            remaining_time = int(USERNAME_CHANGE_PERIOD - (current_time - last_username_change[ip_id]))
+            emit('error', {'message': f"Please wait {remaining_time} seconds before changing your username again."}, broadcast=False)
         else:
-            # Remove old username and add new username
-            active_usernames.discard(old_username.lower())
-            active_usernames.add(new_username_lower)
-            connected_users[ip_id] = new_username
+            if new_username_lower in active_usernames:
+                emit('error', {'message': 'Username already taken'}, broadcast=False)
+            else:
+                # Remove old username and add new username
+                active_usernames.discard(filter_message(old_username.lower()))
+                active_usernames.add(new_username_lower)
+                connected_users[ip_id] = new_username
+                last_username_change[ip_id] = current_time
 
-            # Emit username change message
-            emit('username_changed', {'old_username': old_username, 'new_username': new_username}, broadcast=True)
-            
-            # Update user count without emitting join message again
-            emit('update user count', {'count': len(active_usernames)}, broadcast=True)
-            emit('update online users', {'users': list(active_usernames)}, broadcast=True)
+                # Emit username change message
+                emit('username_changed', {'old_username': old_username, 'new_username': new_username}, broadcast=True)
+                
+                # Update user count without emitting join message again
+                emit('update user count', {'count': len(active_usernames)}, broadcast=True)
+                emit('update online users', {'users': list(active_usernames)}, broadcast=True)
     else:
         emit('error', {'message': 'Invalid username'}, broadcast=False)
 
@@ -283,8 +290,8 @@ def handle_disconnect():
         active_tabs[ip_id] -= 1
         if active_tabs[ip_id] == 0:
             username = connected_users.pop(ip_id, None)
-            if username and username.lower() in active_usernames:
-                active_usernames.remove(username.lower())
+            if username and filter_message(username.lower()) in active_usernames:
+                active_usernames.remove(filter_message(username.lower()))
                 emit('update user count', {'count': len(active_usernames)}, broadcast=True)
                 emit('update online users', {'users': list(active_usernames)}, broadcast=True)
 
@@ -296,7 +303,7 @@ def handle_image(data):
     current_time = time.time()
 
     if validate_username(username) and image_data:
-        # Check if the user has uploaded an image within the last 5 minutes
+        # Check if the user has uploaded an image within the last 1 minute
         if ip_id in last_image_upload and (current_time - last_image_upload[ip_id] < IMAGE_UPLOAD_COOLDOWN):
             remaining_time = int(IMAGE_UPLOAD_COOLDOWN - (current_time - last_image_upload[ip_id]))
             minutes, seconds = divmod(remaining_time, 60)
