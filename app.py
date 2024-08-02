@@ -126,23 +126,8 @@ def get_random_profile_image():
 def validate_username(username):
     return bool(username) and len(username) <= 30 and username.lower() != 'skibbot'
 
-# Replaces instances of naughty words with alternatives based on the given dictionary 
-def filter_message(message):
-    cleanMessage = message
-    for word in naughtyWords:
-        badwords = naughtyWords[word]
-
-        for badword in badwords.split(" / "):
-
-            replacement_word = word
-            bad_word = badword.lower()
-
-            cleanMessage = re.sub(r"( |\b)"+bad_word+r"( |\b)", " "+replacement_word+" ", cleanMessage)
-
-    return cleanMessage
-
 # Validate the message
-def validate_message(message):    
+def validate_message(message):
     return bool(message) and len(message) <= 400
 
 # Sanitize input text to prevent script injection
@@ -203,8 +188,6 @@ def handle_message(data):
     message = sanitize_input(data.get('text', ''))
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
     session_id = request.cookies.get('session_id')
-
-    message = filter_message(message)
 
     if validate_username(username) and validate_message(message):
         current_time = time.time()
@@ -277,7 +260,7 @@ def send_skibbot_message(text):
 def handle_join(data):
     username = sanitize_input(data.get('username', ''))
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
-    username_lower = filter_message(username.lower())
+    username_lower = username.lower()
     current_time = time.time()
     session_id = request.cookies.get('session_id')
 
@@ -304,7 +287,7 @@ def handle_join(data):
 @socketio.on('focus')
 def handle_focus(data):
     username = sanitize_input(data.get('username', ''))
-    username_lower = filter_message(username.lower())
+    username_lower = username.lower()
 
     if validate_username(username):
         if username_lower not in active_usernames:
@@ -315,7 +298,7 @@ def handle_focus(data):
 @socketio.on('blur')
 def handle_blur(data):
     username = sanitize_input(data.get('username', ''))
-    username_lower = filter_message(username.lower())
+    username_lower = username.lower()
 
     if validate_username(username):
         if username_lower in active_usernames:
@@ -328,7 +311,7 @@ def handle_change_username(data):
     old_username = sanitize_input(data.get('old_username', ''))
     new_username = sanitize_input(data.get('new_username', ''))
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
-    new_username_lower = filter_message(new_username.lower())
+    new_username_lower = new_username.lower()
     current_time = time.time()
     session_id = request.cookies.get('session_id')
 
@@ -340,7 +323,7 @@ def handle_change_username(data):
             if new_username_lower in active_usernames:
                 emit('error', {'message': 'Username already taken'}, broadcast=False)
             else:
-                active_usernames.discard(filter_message(old_username.lower()))
+                active_usernames.discard(old_username.lower())
                 active_usernames.add(new_username_lower)
                 connected_users[ip_id] = new_username
                 last_username_change[ip_id] = current_time
@@ -360,8 +343,8 @@ def handle_disconnect():
         active_tabs[ip_id] -= 1
         if active_tabs[ip_id] == 0:
             username = connected_users.pop(ip_id, None)
-            if username and filter_message(username.lower()) in active_usernames:
-                active_usernames.remove(filter_message(username.lower()))
+            if username and username.lower() in active_usernames:
+                active_usernames.remove(username.lower())
                 emit('update user count', {'count': len(active_usernames)}, broadcast=True)
                 emit('update online users', {'users': list(active_usernames)}, broadcast=True)
 
@@ -388,7 +371,7 @@ def handle_image(data):
             past_messages.append({'type': 'image', 'username': username, 'image': resized_image_data, 'timestamp': current_time, 'formatted_datetime': formatted_datetime, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id})
             if len(past_messages) > 30:
                 past_messages.pop(0)
-            emit('image', {'type': 'image', 'username': username, 'image': resized_image_data, 'formatted_datetime': formatted_datetime, 'profile_pic': resized_image_data, 'grouped': grouped, 'session_id': session_id}, broadcast=True)
+            emit('image', {'type': 'image', 'username': username, 'image': resized_image_data, 'formatted_datetime': formatted_datetime, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id}, broadcast=True)
             # Update all past messages with the new profile image
             for message in past_messages:
                 if message['session_id'] == session_id:
