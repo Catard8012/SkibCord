@@ -46,6 +46,7 @@ GROUP_MESSAGE_TIME = 3 * 60  # 3 minutes in seconds
 # Global list to store past messages and images in order
 past_messages = []
 
+# List of word replacements, words-to-replace are separated by " / "
 naughtyWords = {
     "balderdash": "fuk / phuck",
     "bindlestiff": "clitoris",
