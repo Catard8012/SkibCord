@@ -7,8 +7,65 @@
     <title>SkibCord</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+        .message-wrapper {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 5px;
+        }
+        .chat-message {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 5px;
+        }
+        .profile-pic {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 10px;
+        }
+        .message-header {
+            display: flex;
+            align-items: center;
+        }
+        .message-content {
+            display: flex;
+            flex-direction: column;
+        }
+        .username-container-nav {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+        }
+        .username, .timestamp {
+            display: inline;
+        }
+        .grouped-message {
+            margin-left: 60px;
+            display: flex;
+            flex-direction: column;
+            padding-top: 0; /* Ensure no padding at the top */
+        }
+        .grouped-message:not(:first-child) {
+            padding-top: 5px; /* Add padding between grouped messages */
+        }
+        .chat-image {
+            max-width: 200px;
+            max-height: 200px;
+            object-fit: cover;
+        }
+        .group-start {
+            padding-top: 10px; /* Padding between the start of each group */
+            margin-bottom: -5px; /* Adjust margin to handle grouped messages */
+        }
+    </style>
     <script>
-        let isHbLogo = true; // Flag to track the current favicon
+        let isHbLogo = true;
+        let lastProfileImageChange = 0;
+        let lastMessageSessionId = null;
 
         function setCookie(name, value, days) {
             const date = new Date();
@@ -143,6 +200,9 @@
                 localStorage.setItem('session_id', sessionId);
             }
 
+            const randomProfileImage = "{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}";
+            document.getElementById('profile_pic_nav').src = randomProfileImage;
+            localStorage.setItem('profile_pic', randomProfileImage);
             document.getElementById('current_username_nav').value = username;
 
             const socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
@@ -150,74 +210,139 @@
             const input = document.querySelector('#chat_input');
             const sendButton = document.querySelector('#send_button');
             const imageInput = document.querySelector('#image_input');
+            const profilePicInput = document.getElementById('profile_pic_input');
             const xiaojiecat = document.querySelector('#xiaojiecat');
             const onlineUsers = document.querySelector('#online-users .count');
             const onlineUsersBox = document.getElementById('online-users-box');
             const editIconNav = document.querySelector('#edit_icon_nav');
             const currentUsernameNav = document.querySelector('#current_username_nav');
             let lastMessageTimes = [];
+            let lastMessageUser = '';
+            let lastMessageSession = '';
             const messageDelay = 5;
             const messageThreshold = 3;
             const cooldownPeriod = 5000;
             let isInCooldown = false;
             let isSpinning = false;
 
-            // Function to append past messages on page load
             function appendPastMessages() {
                 const pastMessages = {{ past_messages | tojson }};
                 pastMessages.forEach(msg => {
                     if (msg.type === 'message') {
-                        appendMessage(msg.text, msg.username);
+                        appendMessage(msg.text, msg.username, msg.formatted_datetime, msg.profile_pic, msg.grouped, msg.session_id);
                     } else if (msg.type === 'image') {
-                        appendImage(msg.image, msg.username);
+                        appendImage(msg.image, msg.username, msg.formatted_datetime, msg.profile_pic, msg.grouped, msg.session_id);
                     }
                 });
             }
 
             function handleJoin(isNewUser) {
                 socket.emit('join', { username: username, session_id: sessionId, is_new_user: isNewUser });
-                appendPastMessages(); // Append past messages after joining
+                appendPastMessages();
             }
 
-            // Check if the user is new or returning
             const isNewUser = !sessionStorage.getItem('joined');
             sessionStorage.setItem('joined', 'true');
             handleJoin(isNewUser);
 
-            function appendMessage(content, username = '', style = '') {
-                const p = document.createElement('p');
-                if (username) {
-                    const span = document.createElement('span');
-                    span.classList.add('username');
-                    span.textContent = username + ': ';
-                    p.appendChild(span);
-                }
-                p.appendChild(document.createTextNode(content));
+            function appendMessage(content, username = '', datetime = '', profilePic = '', grouped = false, session_id = '') {
+                const messageWrapper = document.createElement('div');
+                messageWrapper.classList.add('message-wrapper');
+
+                const p = document.createElement('div');
                 p.classList.add('chat-message');
-                if (style) {
-                    p.classList.add(style);
+
+                if (!grouped || lastMessageSessionId !== session_id) {
+                    const img = document.createElement('img');
+                    img.src = profilePic || "{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}";
+                    img.classList.add('profile-pic');
+                    messageWrapper.appendChild(img);
+
+                    const messageContent = document.createElement('div');
+                    messageContent.classList.add('message-content');
+
+                    const header = document.createElement('div');
+                    header.classList.add('message-header');
+
+                    if (username) {
+                        const spanUsername = document.createElement('span');
+                        spanUsername.classList.add('username');
+                        spanUsername.textContent = username;
+                        const spanTime = document.createElement('span');
+                        spanTime.classList.add('timestamp');
+                        spanTime.textContent = ` ${datetime}`;
+                        header.appendChild(spanUsername);
+                        header.appendChild(spanTime);
+                    }
+
+                    const messageText = document.createElement('div');
+                    messageText.textContent = content;
+
+                    messageContent.appendChild(header);
+                    messageContent.appendChild(messageText);
+
+                    p.appendChild(messageContent);
+                    p.classList.add('group-start'); // Ensure proper positioning for the first message
+                } else {
+                    p.classList.add('grouped-message');
+                    const messageText = document.createElement('div');
+                    messageText.textContent = content;
+                    p.appendChild(messageText);
                 }
-                messages.appendChild(p);
+
+                messageWrapper.appendChild(p);
+                messages.appendChild(messageWrapper);
                 ensureMessageLimit();
                 scrollToBottom();
                 checkForXiaojiecat(content, username);
+                lastMessageSessionId = session_id;
             }
 
-            function appendImage(imageData, username = '') {
-                const p = document.createElement('p');
-                if (username) {
-                    const span = document.createElement('span');
-                    span.classList.add('username');
-                    span.textContent = username + ': ';
-                    p.appendChild(span);
+            function appendImage(imageData, username = '', datetime = '', profilePic = '', grouped = false, session_id = '') {
+                const messageWrapper = document.createElement('div');
+                messageWrapper.classList.add('message-wrapper');
+
+                const p = document.createElement('div');
+                p.classList.add('chat-message');
+
+                if (!grouped || lastMessageSessionId !== session_id) {
+                    const img = document.createElement('img');
+                    img.src = profilePic || "{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}";
+                    img.classList.add('profile-pic');
+                    messageWrapper.appendChild(img);
                 }
-                const img = document.createElement('img');
-                img.src = imageData;
-                img.classList.add('chat-image');
-                p.appendChild(img);
-                messages.appendChild(p);
+
+                const messageContent = document.createElement('div');
+                messageContent.classList.add('message-content');
+
+                const header = document.createElement('div');
+                header.classList.add('message-header');
+
+                if (username) {
+                    const spanUsername = document.createElement('span');
+                    spanUsername.classList.add('username');
+                    spanUsername.textContent = username;
+                    const spanTime = document.createElement('span');
+                    spanTime.classList.add('timestamp');
+                    spanTime.textContent = ` ${datetime}`;
+                    header.appendChild(spanUsername);
+                    header.appendChild(spanTime);
+                }
+
+                const imgElement = document.createElement('img');
+                imgElement.src = imageData;
+                imgElement.classList.add('chat-image');
+
+                messageContent.appendChild(header);
+                messageContent.appendChild(imgElement);
+
+                p.appendChild(messageContent);
+
+                messageWrapper.appendChild(p);
+                messages.appendChild(messageWrapper);
                 ensureMessageLimit();
                 scrollToBottom();
+                lastMessageSessionId = session_id;
             }
 
             function scrollToBottom() {
@@ -254,20 +379,42 @@
                 const text = input.value.trim();
                 if (!text) return;
 
+                const grouped = lastMessageSession === sessionId && (now - lastMessageTimes[lastMessageTimes.length - 1]) < (3 * 60 * 1000);
+
                 socket.emit('message', { username: username, text: text, session_id: sessionId });
                 input.value = '';
                 lastMessageTimes.push(now);
+                lastMessageUser = username;
+                lastMessageSession = sessionId;
             }
 
             function changeUsername(newUsername) {
-                if (newUsername && newUsername.length <= 30) {
+                if (newUsername && newUsername.length <= 30 && newUsername.toLowerCase() !== 'skibbot') {
                     socket.emit('change_username', { old_username: username, new_username: newUsername, session_id: sessionId });
                     username = newUsername;
                     localStorage.setItem('username', newUsername);
                     currentUsernameNav.value = newUsername;
                 } else {
-                    alert("Username must be 30 characters or less.");
+                    alert("Invalid username.");
                 }
+            }
+
+            function changeProfilePic(newProfilePic) {
+                const now = new Date().getTime();
+                if (now - lastProfileImageChange < 60 * 1000) {
+                    const remainingTime = 60 - Math.floor((now - lastProfileImageChange) / 1000);
+                    alert(`Please wait ${remainingTime} seconds before changing your profile image again.`);
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const imageData = e.target.result;
+                    socket.emit('profile_image', { image: imageData, session_id: sessionId });
+                    localStorage.setItem('profile_pic', imageData);
+                    document.getElementById('profile_pic_nav').src = imageData;
+                    lastProfileImageChange = now;
+                };
+                reader.readAsDataURL(newProfilePic);
             }
 
             sendButton.onclick = sendMessage;
@@ -285,6 +432,21 @@
                     changeUsername(newUsername);
                 }
             };
+
+            document.getElementById('profile_pic_nav').onclick = () => {
+                profilePicInput.click();
+            };
+
+            profilePicInput.addEventListener('change', function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    if (file.size > 1024 * 1024) {
+                        alert("Please upload images smaller than 1MB. You can use https://squoosh.app/ to shrink your images.");
+                        return;
+                    }
+                    changeProfilePic(file);
+                }
+            });
 
             imageInput.addEventListener('change', function(event) {
                 const file = event.target.files[0];
@@ -316,15 +478,15 @@
             });
 
             socket.on('message', function(data) {
-                appendMessage(data.text, data.username, data.color ? 'timeout-message' : '');
+                appendMessage(data.text, data.username, data.formatted_datetime, data.profile_pic, data.grouped, data.session_id);
             });
 
             socket.on('image', function(data) {
-                appendImage(data.image, data.username);
+                appendImage(data.image, data.username, data.formatted_datetime, data.profile_pic, data.grouped, data.session_id);
             });
 
             socket.on('user joined', function(data) {
-                appendMessage(data.message, '', 'system-message');
+                appendMessage(data.message, 'SkibBot', data.formatted_datetime, 'static/Images/SkibBot.png');
             });
 
             socket.on('error', function(data) {
@@ -342,7 +504,7 @@
             });
 
             socket.on('username_changed', function(data) {
-                appendMessage(`${data.old_username} changed their username to ${data.new_username}`, '', 'system-message');
+                appendMessage(`${data.old_username} changed their username to ${data.new_username}`, 'SkibBot', data.formatted_datetime, 'static/Images/SkibBot.png');
             });
 
             socket.on('update online users', function(data) {
@@ -352,6 +514,24 @@
                     userElement.classList.add('user');
                     userElement.textContent = user;
                     onlineUsersBox.appendChild(userElement);
+                });
+            });
+
+            socket.on('profile_image_updated', function(data) {
+                document.getElementById('profile_pic_nav').src = data.image;
+                // Update profile pictures in past messages
+                document.querySelectorAll('.profile-pic').forEach(img => {
+                    if (img.dataset.sessionId === data.session_id) {
+                        img.src = data.image;
+                    }
+                });
+            });
+
+            socket.on('update_profile_image', function(data) {
+                document.querySelectorAll('.profile-pic').forEach(img => {
+                    if (img.dataset.sessionId === data.session_id) {
+                        img.src = data.profile_pic;
+                    }
                 });
             });
 
@@ -392,7 +572,6 @@
 
             document.getElementById('full-screen-image').style.display = 'none';
 
-            // Add event listener for Rejoin button
             document.getElementById('rejoin_button').onclick = function() {
                 const savedScheme = localStorage.getItem('color_scheme') || 1;
                 localStorage.setItem('rejoin', 'true');
@@ -400,17 +579,14 @@
                 setColorScheme(savedScheme);
             };
 
-            // Handle rejoin
             if (localStorage.getItem('rejoin') === 'true') {
                 localStorage.removeItem('rejoin');
                 socket.emit('rejoin', { username: username, session_id: sessionId });
             }
 
-            // Set the saved color scheme or default to scheme 1
             const savedScheme = localStorage.getItem('color_scheme') || 1;
             setColorScheme(savedScheme);
 
-            // Emit focus and blur events
             window.addEventListener('focus', () => {
                 socket.emit('focus', { username: username, session_id: sessionId });
             });
@@ -434,6 +610,8 @@
             <span class="version">v1.2</span>
         </div>
         <div class="username-container-nav">
+            <img id="profile_pic_nav" class="profile-pic" src="{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}" alt="Profile Picture">
+            <input type="file" id="profile_pic_input" style="display: none;" accept="image/*">
             <input type="text" id="current_username_nav" class="username-display-nav" readonly>
             <img src="{{ url_for('static', filename='Images/Pen-CS1.png') }}" alt="Edit" id="edit_icon_nav">
         </div>
