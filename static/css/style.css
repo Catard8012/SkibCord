@@ -203,7 +203,7 @@ body {
     background: var(--secondary-color);
     border: 1px solid var(--main-color);
     word-wrap: break-word;
-    word-break: break-all;
+    word-break: break-word;
     height: calc(100% - 50px); /* Adjust height to prevent overflow */
     max-height: calc(100vh - 180px); /* Adjust max height to fit within the viewport */
 }
@@ -321,6 +321,22 @@ body {
 
 .chat-message {
     color: var(--text-color);
+
+}
+
+.timestamp {
+    font-size: 0.8em;
+    color: #bfbfbf;
+    margin-left: 5px;
+}
+
+.message-content {
+    display: block; /* Ensure the message content is on a new line */
+}
+
+.chat-message {
+    white-space: pre-wrap; /* Preserve whitespace and wrap long text */
+    word-wrap: break-word; /* Break long words */
 }
 
 /* Online users styling */
@@ -435,3 +451,4 @@ body {
     max-width: 100%;
     max-height: 100%;
 }
+
