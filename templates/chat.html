@@ -56,6 +56,7 @@
             max-width: 200px;
             max-height: 200px;
             object-fit: cover;
+            padding-left: 60px;  /* Adjust padding to match text position */
         }
         .group-start {
             padding-top: 10px; /* Padding between the start of each group */
@@ -77,7 +78,7 @@
         function getCookie(name) {
             const nameEQ = name + "=";
             const ca = document.cookie.split(';');
-            for (let i = 0; i < ca.length; i++) {
+            for (let i = 0; ca.length > i; i++) {
                 let c = ca[i].trim();
                 if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
             }
@@ -201,8 +202,9 @@
             }
 
             const randomProfileImage = "{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}";
-            document.getElementById('profile_pic_nav').src = randomProfileImage;
-            localStorage.setItem('profile_pic', randomProfileImage);
+            const profileImage = getCookie('profile_pic') || randomProfileImage;
+            document.getElementById('profile_pic_nav').src = profileImage;
+            localStorage.setItem('profile_pic', profileImage);
             document.getElementById('current_username_nav').value = username;
 
             const socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
@@ -231,7 +233,7 @@
                     if (msg.type === 'message') {
                         appendMessage(msg.text, msg.username, msg.formatted_datetime, msg.profile_pic, msg.grouped, msg.session_id);
                     } else if (msg.type === 'image') {
-                        appendImage(msg.image, msg.username, msg.formatted_datetime, msg.profile_pic, msg.grouped, msg.session_id);
+                        appendImage(msg.image, msg.username, msg.profile_pic, msg.grouped, msg.session_id);
                     }
                 });
             }
@@ -256,6 +258,7 @@
                     const img = document.createElement('img');
                     img.src = profilePic || "{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}";
                     img.classList.add('profile-pic');
+                    img.dataset.sessionId = session_id;
                     messageWrapper.appendChild(img);
 
                     const messageContent = document.createElement('div');
@@ -298,7 +301,7 @@
                 lastMessageSessionId = session_id;
             }
 
-            function appendImage(imageData, username = '', datetime = '', profilePic = '', grouped = false, session_id = '') {
+            function appendImage(imageData, username = '', profilePic = '', grouped = false, session_id = '') {
                 const messageWrapper = document.createElement('div');
                 messageWrapper.classList.add('message-wrapper');
 
@@ -309,31 +312,17 @@
                     const img = document.createElement('img');
                     img.src = profilePic || "{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}";
                     img.classList.add('profile-pic');
+                    img.dataset.sessionId = session_id;
                     messageWrapper.appendChild(img);
                 }
 
                 const messageContent = document.createElement('div');
                 messageContent.classList.add('message-content');
 
-                const header = document.createElement('div');
-                header.classList.add('message-header');
-
-                if (username) {
-                    const spanUsername = document.createElement('span');
-                    spanUsername.classList.add('username');
-                    spanUsername.textContent = username;
-                    const spanTime = document.createElement('span');
-                    spanTime.classList.add('timestamp');
-                    spanTime.textContent = ` ${datetime}`;
-                    header.appendChild(spanUsername);
-                    header.appendChild(spanTime);
-                }
-
                 const imgElement = document.createElement('img');
                 imgElement.src = imageData;
                 imgElement.classList.add('chat-image');
 
-                messageContent.appendChild(header);
                 messageContent.appendChild(imgElement);
 
                 p.appendChild(messageContent);
@@ -381,7 +370,8 @@
 
                 const grouped = lastMessageSession === sessionId && (now - lastMessageTimes[lastMessageTimes.length - 1]) < (3 * 60 * 1000);
 
-                socket.emit('message', { username: username, text: text, session_id: sessionId });
+                const profilePic = getCookie('profile_pic') || "{{ url_for('static', filename='Images/Skibcordlogo-CS1.png') }}";
+                socket.emit('message', { username: username, text: text, session_id: sessionId, profile_pic: profilePic });
                 input.value = '';
                 lastMessageTimes.push(now);
                 lastMessageUser = username;
@@ -411,6 +401,7 @@
                     const imageData = e.target.result;
                     socket.emit('profile_image', { image: imageData, session_id: sessionId });
                     localStorage.setItem('profile_pic', imageData);
+                    setCookie('profile_pic', imageData, 30);  // Save profile picture in cookie for 30 days
                     document.getElementById('profile_pic_nav').src = imageData;
                     lastProfileImageChange = now;
                 };
@@ -482,7 +473,7 @@
             });
 
             socket.on('image', function(data) {
-                appendImage(data.image, data.username, data.formatted_datetime, data.profile_pic, data.grouped, data.session_id);
+                appendImage(data.image, data.username, data.profile_pic, data.grouped, data.session_id);
             });
 
             socket.on('user joined', function(data) {
@@ -519,7 +510,6 @@
 
             socket.on('profile_image_updated', function(data) {
                 document.getElementById('profile_pic_nav').src = data.image;
-                // Update profile pictures in past messages
                 document.querySelectorAll('.profile-pic').forEach(img => {
                     if (img.dataset.sessionId === data.session_id) {
                         img.src = data.image;
