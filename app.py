@@ -142,7 +142,7 @@ def resize_image(image_data, max_size):
         frames = []
         for frame in ImageSequence.Iterator(image):
             frame.thumbnail(max_size, Image.ANTIALIAS)
-            buffer = io.BytesIO()
+            buffer = io.Bytes.IO()
             frame.save(buffer, format="GIF")
             frames.append(buffer.getvalue())
         return f"data:image/gif;base64,{base64.b64encode(b''.join(frames)).decode('utf-8')}"
@@ -188,6 +188,7 @@ def handle_message(data):
     message = sanitize_input(data.get('text', ''))
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
     session_id = request.cookies.get('session_id')
+    profile_pic = profile_pictures.get(session_id, get_random_profile_image())
 
     if validate_username(username) and validate_message(message):
         current_time = time.time()
@@ -227,7 +228,6 @@ def handle_message(data):
             emit('message', {'username': 'SkibBot', 'text': f'{username} has been banned for {SPAM_BAN_PERIOD} seconds for spamming.', 'color': '#d16262', 'profile_pic': 'static/Images/SkibBot.png'}, broadcast=True)
         else:
             global last_message
-            profile_pic = profile_pictures.get(ip_id, get_random_profile_image())
             grouped = should_group_message(last_message, session_id, current_time)
             past_messages.append({'type': 'message', 'username': username, 'text': message, 'timestamp': current_time, 'formatted_datetime': formatted_datetime, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id})
             if len(past_messages) > 30:
@@ -238,24 +238,6 @@ def handle_message(data):
     else:
         emit('error', {'message': 'Please stay below 400 characters.'}, broadcast=False)
 
-def send_skibbot_message(text):
-    current_time = time.time()
-    formatted_datetime = format_datetime(current_time)
-    message_data = {
-        'type': 'message',
-        'username': 'SkibBot',
-        'text': text,
-        'timestamp': current_time,
-        'formatted_datetime': formatted_datetime,
-        'profile_pic': 'static/Images/SkibBot.png',
-        'grouped': False,
-        'session_id': 'SkibBot'
-    }
-    past_messages.append(message_data)
-    if len(past_messages) > 30:
-        past_messages.pop(0)
-    emit('message', message_data, broadcast=True)
-
 @socketio.on('join')
 def handle_join(data):
     username = sanitize_input(data.get('username', ''))
@@ -263,6 +245,7 @@ def handle_join(data):
     username_lower = username.lower()
     current_time = time.time()
     session_id = request.cookies.get('session_id')
+    profile_pic = profile_pictures.get(session_id, get_random_profile_image())
 
     if validate_username(username):
         if ip_id not in connected_users:
@@ -270,8 +253,7 @@ def handle_join(data):
             active_usernames.add(username_lower)
             active_tabs[ip_id] = 1
 
-            # Set a random default profile picture each time
-            profile_pictures[ip_id] = profile_pictures.get(ip_id, get_random_profile_image())
+            profile_pictures[session_id] = profile_pic
 
             # Check if user is new or returning
             if data.get('is_new_user', True):
@@ -280,7 +262,7 @@ def handle_join(data):
 
         emit('update user count', {'count': len(active_usernames)}, broadcast=True)
         emit('update online users', {'users': list(active_usernames)}, broadcast=True)
-        emit('profile_image_updated', {'image': profile_pictures[ip_id], 'session_id': session_id}, room=request.sid)
+        emit('profile_image_updated', {'image': profile_pic, 'session_id': session_id}, room=request.sid)
     else:
         emit('error', {'message': 'Invalid username'}, broadcast=False)
 
@@ -354,7 +336,6 @@ def handle_image(data):
     image_data = data.get('image')
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
     current_time = time.time()
-    formatted_datetime = format_datetime(current_time)
     session_id = request.cookies.get('session_id')
 
     if validate_username(username) and image_data:
@@ -365,32 +346,26 @@ def handle_image(data):
         else:
             last_image_upload[ip_id] = current_time
             resized_image_data = resize_image(image_data, MAX_IMAGE_SIZE)
-            profile_pic = profile_pictures.get(ip_id, get_random_profile_image())
-            profile_pictures[ip_id] = resized_image_data  # Update profile picture
+            profile_pic = profile_pictures.get(session_id, get_random_profile_image())
+            profile_pictures[session_id] = resized_image_data  # Update profile picture
             grouped = should_group_message(last_message, session_id, current_time)
-            past_messages.append({'type': 'image', 'username': username, 'image': resized_image_data, 'timestamp': current_time, 'formatted_datetime': formatted_datetime, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id})
+            past_messages.append({'type': 'image', 'username': username, 'image': resized_image_data, 'timestamp': current_time, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id})
             if len(past_messages) > 30:
                 past_messages.pop(0)
-            emit('image', {'type': 'image', 'username': username, 'image': resized_image_data, 'formatted_datetime': formatted_datetime, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id}, broadcast=True)
-            # Update all past messages with the new profile image
-            for message in past_messages:
-                if message['session_id'] == session_id:
-                    message['profile_pic'] = resized_image_data
+            emit('image', {'type': 'image', 'username': username, 'image': resized_image_data, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id}, broadcast=True)
             # Update last message tracking
             last_message = {'session_id': session_id, 'timestamp': current_time}
-            # Emit an event to update all instances of the profile image for the session
-            emit('update_profile_image', {'session_id': session_id, 'profile_pic': resized_image_data}, broadcast=True)
     else:
         emit('error', {'message': 'Invalid input or missing image data'}, broadcast=False)
 
 @socketio.on('profile_image')
 def handle_profile_image(data):
     image_data = data.get('image')
-    ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
     session_id = request.cookies.get('session_id')
     if image_data:
         resized_image_data = resize_image(image_data, PROFILE_PIC_SIZE)
-        profile_pictures[ip_id] = resized_image_data
+        profile_pictures[session_id] = resized_image_data
+
         emit('profile_image_updated', {'image': resized_image_data, 'session_id': session_id}, broadcast=False)
         # Update all past messages with the new profile image
         for message in past_messages:
