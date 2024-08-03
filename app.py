@@ -130,6 +130,14 @@ def validate_username(username):
 def validate_message(message):
     return bool(message) and len(message) <= 400
 
+# Censor naughty words in the message
+def censor_message(message):
+    for replacement, words in naughtyWords.items():
+        for word in words.split(" / "):
+            pattern = re.compile(re.escape(word), re.IGNORECASE)
+            message = pattern.sub(replacement, message)
+    return message
+
 # Sanitize input text to prevent script injection
 def sanitize_input(text):
     return bleach.clean(text, tags=set([]))
@@ -186,6 +194,7 @@ def chat():
 def handle_message(data):
     username = sanitize_input(data.get('username', ''))
     message = sanitize_input(data.get('text', ''))
+    message = censor_message(message)
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
     session_id = request.cookies.get('session_id')
     profile_pic = profile_pictures.get(session_id, get_random_profile_image())
