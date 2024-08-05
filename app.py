@@ -4,7 +4,7 @@ from flask_wtf.csrf import CSRFProtect
 import time
 import bleach
 import base64
-from PIL import Image, ImageSequence
+from PIL import Image, ImageSequence, ImageOps
 import io, re
 from datetime import datetime, timedelta
 import random
@@ -23,7 +23,6 @@ session_cooldowns = {}
 connected_users = {}
 active_usernames = set()
 session_join_times = {}
-last_username_change = {}
 active_tabs = {}
 last_image_upload = {}  # Dictionary to track last image upload time
 profile_pictures = {}  # Dictionary to store user profile pictures
@@ -145,21 +144,19 @@ def sanitize_input(text):
 # Function to resize an image, handling GIFs to retain animation
 def resize_image(image_data, max_size):
     image = Image.open(io.BytesIO(base64.b64decode(image_data.split(",")[1])))
+    output = io.BytesIO()
     
     if image.format == 'GIF':
         frames = []
         for frame in ImageSequence.Iterator(image):
-            frame.thumbnail(max_size, Image.ANTIALIAS)
-            buffer = io.Bytes.IO()
-            frame.save(buffer, format="GIF")
-            frames.append(buffer.getvalue())
-        return f"data:image/gif;base64,{base64.b64encode(b''.join(frames)).decode('utf-8')}"
+            frame = ImageOps.fit(frame.convert('RGBA'), max_size, Image.LANCZOS)
+            frames.append(frame)
+        frames[0].save(output, format="GIF", save_all=True, append_images=frames[1:], loop=0, duration=image.info['duration'])
     else:
         image.thumbnail(max_size)
-        buffered = io.BytesIO()
-        image.save(buffered, format=image.format)
-        resized_image_data = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        return f"data:image/{image.format.lower()};base64,{resized_image_data}"
+        image.save(output, format=image.format)
+    
+    return f"data:image/{image.format.lower()};base64,{base64.b64encode(output.getvalue()).decode('utf-8')}"
 
 def format_datetime(timestamp):
     now = datetime.now()
@@ -306,9 +303,12 @@ def handle_change_username(data):
     current_time = time.time()
     session_id = request.cookies.get('session_id')
 
+    last_username_change_time = request.cookies.get('last_username_change_time')
+    last_username_change_time = float(last_username_change_time) if last_username_change_time else 0
+
     if validate_username(new_username):
-        if ip_id in last_username_change and (current_time - last_username_change[ip_id] < USERNAME_CHANGE_PERIOD):
-            remaining_time = int(USERNAME_CHANGE_PERIOD - (current_time - last_username_change[ip_id]))
+        if current_time - last_username_change_time < USERNAME_CHANGE_PERIOD:
+            remaining_time = int(USERNAME_CHANGE_PERIOD - (current_time - last_username_change_time))
             emit('error', {'message': f"Please wait {remaining_time} seconds before changing your username again."}, broadcast=False)
         else:
             if new_username_lower in active_usernames:
@@ -317,12 +317,18 @@ def handle_change_username(data):
                 active_usernames.discard(old_username.lower())
                 active_usernames.add(new_username_lower)
                 connected_users[ip_id] = new_username
-                last_username_change[ip_id] = current_time
 
-                emit('username_changed', {'old_username': old_username, 'new_username': new_username}, broadcast=True)
+                # Update past messages with the new username
+                for message in past_messages:
+                    if message['username'] == old_username:
+                        message['username'] = new_username
+
+                response = make_response(emit('username_changed', {'old_username': old_username, 'new_username': new_username, 'session_id': session_id}, broadcast=True))
+                response.set_cookie('last_username_change_time', str(current_time), max_age=7*24*60*60)  # 7 days
                 emit('update user count', {'count': len(active_usernames)}, broadcast=True)
                 emit('update online users', {'users': list(active_usernames)}, broadcast=True)
                 send_skibbot_message(f"{old_username} changed their username to {new_username}")
+                return response
     else:
         emit('error', {'message': 'Invalid username'}, broadcast=False)
 
@@ -347,13 +353,17 @@ def handle_image(data):
     current_time = time.time()
     session_id = request.cookies.get('session_id')
 
+    last_image_upload_time = request.cookies.get('last_image_upload_time')
+    last_image_upload_time = float(last_image_upload_time) if last_image_upload_time else 0
+
     if validate_username(username) and image_data:
-        if ip_id in last_image_upload and (current_time - last_image_upload[ip_id] < IMAGE_UPLOAD_COOLDOWN):
-            remaining_time = int(IMAGE_UPLOAD_COOLDOWN - (current_time - last_image_upload[ip_id]))
+        if current_time - last_image_upload_time < IMAGE_UPLOAD_COOLDOWN:
+            remaining_time = int(IMAGE_UPLOAD_COOLDOWN - (current_time - last_image_upload_time))
             minutes, seconds = divmod(remaining_time, 60)
             emit('error', {'message': f"Please wait {minutes}:{seconds:02d} before uploading another image."}, broadcast=False)
         else:
-            last_image_upload[ip_id] = current_time
+            response = make_response()
+            last_image_upload[session_id] = current_time
             resized_image_data = resize_image(image_data, MAX_IMAGE_SIZE)
             profile_pic = profile_pictures.get(session_id, get_random_profile_image())
             profile_pictures[session_id] = resized_image_data  # Update profile picture
@@ -364,6 +374,8 @@ def handle_image(data):
             emit('image', {'type': 'image', 'username': username, 'image': resized_image_data, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id}, broadcast=True)
             # Update last message tracking
             last_message = {'session_id': session_id, 'timestamp': current_time}
+            response.set_cookie('last_image_upload_time', str(current_time), max_age=7*24*60*60)  # 7 days
+            return response
     else:
         emit('error', {'message': 'Invalid input or missing image data'}, broadcast=False)
 
@@ -371,17 +383,29 @@ def handle_image(data):
 def handle_profile_image(data):
     image_data = data.get('image')
     session_id = request.cookies.get('session_id')
-    if image_data:
-        resized_image_data = resize_image(image_data, PROFILE_PIC_SIZE)
-        profile_pictures[session_id] = resized_image_data
+    current_time = time.time()
+    last_profile_image_change_time = request.cookies.get('last_profile_image_change_time')
+    last_profile_image_change_time = float(last_profile_image_change_time) if last_profile_image_change_time else 0
 
-        emit('profile_image_updated', {'image': resized_image_data, 'session_id': session_id}, broadcast=False)
-        # Update all past messages with the new profile image
-        for message in past_messages:
-            if message['session_id'] == session_id:
-                message['profile_pic'] = resized_image_data
-        # Emit an event to update all instances of the profile image for the session
-        emit('update_profile_image', {'session_id': session_id, 'profile_pic': resized_image_data}, broadcast=True)
+    if current_time - last_profile_image_change_time < IMAGE_UPLOAD_COOLDOWN:
+        remaining_time = int(IMAGE_UPLOAD_COOLDOWN - (current_time - last_profile_image_change_time))
+        minutes, seconds = divmod(remaining_time, 60)
+        emit('error', {'message': f"Please wait {minutes}:{seconds:02d} before changing your profile image again."}, broadcast=False)
+    else:
+        if image_data:
+            resized_image_data = resize_image(image_data, PROFILE_PIC_SIZE)
+            profile_pictures[session_id] = resized_image_data
+
+            response = make_response(emit('profile_image_updated', {'image': resized_image_data, 'session_id': session_id}, broadcast=False))
+            response.set_cookie('last_profile_image_change_time', str(current_time), max_age=7*24*60*60)  # 7 days
+
+            # Update all past messages with the new profile image
+            for message in past_messages:
+                if message['session_id'] == session_id:
+                    message['profile_pic'] = resized_image_data
+            # Emit an event to update all instances of the profile image for the session
+            emit('update_profile_image', {'session_id': session_id, 'profile_pic': resized_image_data}, broadcast=True)
+            return response
 
 @socketio.on('clean')
 def handle_clean(data):
