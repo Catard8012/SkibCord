@@ -14,6 +14,14 @@
     --background-color: #561F09;
 }
 
+/* OG Color Scheme 2 */
+:root.OGscheme2 {
+    --main-color: pink;
+    --secondary-color: orange;
+    --text-color: white;
+    --background-color: red;
+}
+
 /* General body styling */
 body {
     background-color: var(--background-color);
@@ -452,3 +460,57 @@ body {
     max-height: 100%;
 }
 
+.message-wrapper {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 5px;
+}
+.chat-message {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 5px;
+}
+.profile-pic {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: 10px;
+}
+.message-header {
+    display: flex;
+    align-items: center;
+}
+.message-content {
+    display: flex;
+    flex-direction: column;
+}
+.username-container-nav {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+.username, .timestamp {
+    display: inline;
+}
+.grouped-message {
+    margin-left: 60px;
+    display: flex;
+    flex-direction: column;
+    padding-top: 0; /* Ensure no padding at the top */
+}
+.grouped-message:not(:first-child) {
+    padding-top: 5px; /* Add padding between grouped messages */
+}
+.chat-image {
+    max-width: 200px;
+    max-height: 200px;
+    object-fit: cover;
+    padding-left: 60px;  /* Adjust padding to match text position */
+}
+.group-start {
+    padding-top: 10px; /* Padding between the start of each group */
+    margin-bottom: -5px; /* Adjust margin to handle grouped messages */
+}
