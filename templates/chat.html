@@ -7,62 +7,6 @@
     <title>SkibCord</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
-    <style>
-        .message-wrapper {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 5px;
-        }
-        .chat-message {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            display: flex;
-            flex-direction: column;
-            margin-bottom: 5px;
-        }
-        .profile-pic {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            object-fit: cover;
-            margin-right: 10px;
-        }
-        .message-header {
-            display: flex;
-            align-items: center;
-        }
-        .message-content {
-            display: flex;
-            flex-direction: column;
-        }
-        .username-container-nav {
-            display: flex;
-            align-items: center;
-            cursor: pointer;
-        }
-        .username, .timestamp {
-            display: inline;
-        }
-        .grouped-message {
-            margin-left: 60px;
-            display: flex;
-            flex-direction: column;
-            padding-top: 0; /* Ensure no padding at the top */
-        }
-        .grouped-message:not(:first-child) {
-            padding-top: 5px; /* Add padding between grouped messages */
-        }
-        .chat-image {
-            max-width: 200px;
-            max-height: 200px;
-            object-fit: cover;
-            padding-left: 60px;  /* Adjust padding to match text position */
-        }
-        .group-start {
-            padding-top: 10px; /* Padding between the start of each group */
-            margin-bottom: -5px; /* Adjust margin to handle grouped messages */
-        }
-    </style>
     <script>
         let isHbLogo = true;
         let lastProfileImageChange = 0;
