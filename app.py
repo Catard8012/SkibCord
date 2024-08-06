@@ -37,7 +37,7 @@ HACK_BAN_PERIOD = 5 * 60  # seconds
 JOIN_THRESHOLD = 7  # Number of joins within the period to trigger ban
 JOIN_PERIOD = 10  # Period in seconds to check for join frequency
 USERNAME_CHANGE_PERIOD = 60  # 1 minute in seconds
-IMAGE_UPLOAD_COOLDOWN = 60  # 1 minute in seconds
+IMAGE_UPLOAD_COOLDOWN = 2 # 1 minute in seconds
 PROFILE_PIC_SIZE = (50, 50)  # Size of the profile picture
 MAX_IMAGE_SIZE = (1024, 1024)  # Max size for uploaded images
 GROUP_MESSAGE_TIME = 3 * 60  # 3 minutes in seconds
@@ -149,7 +149,7 @@ def resize_image(image_data, max_size):
     if image.format == 'GIF':
         frames = []
         for frame in ImageSequence.Iterator(image):
-            frame = ImageOps.fit(frame.convert('RGBA'), max_size, Image.LANCZOS)
+            frame = ImageOps.fit(frame.convert('RGBA'), max_size, Image.Resampling.LANCZOS)
             frames.append(frame)
         frames[0].save(output, format="GIF", save_all=True, append_images=frames[1:], loop=0, duration=image.info['duration'])
     else:
@@ -264,7 +264,7 @@ def handle_join(data):
             # Check if user is new or returning
             if data.get('is_new_user', True):
                 join_message = f'{username} has joined the chat'
-                send_skibbot_message(join_message)
+                # send_skibbot_message(join_message)
 
         emit('update user count', {'count': len(active_usernames)}, broadcast=True)
         emit('update online users', {'users': list(active_usernames)}, broadcast=True)
@@ -327,7 +327,7 @@ def handle_change_username(data):
                 response.set_cookie('last_username_change_time', str(current_time), max_age=7*24*60*60)  # 7 days
                 emit('update user count', {'count': len(active_usernames)}, broadcast=True)
                 emit('update online users', {'users': list(active_usernames)}, broadcast=True)
-                send_skibbot_message(f"{old_username} changed their username to {new_username}")
+                # send_skibbot_message(f"{old_username} changed their username to {new_username}")
                 return response
     else:
         emit('error', {'message': 'Invalid username'}, broadcast=False)
@@ -349,33 +349,36 @@ def handle_disconnect():
 def handle_image(data):
     username = sanitize_input(data.get('username', ''))
     image_data = data.get('image')
-    ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
+    session_id = data.get('session_id')
     current_time = time.time()
-    session_id = request.cookies.get('session_id')
-
-    last_image_upload_time = request.cookies.get('last_image_upload_time')
-    last_image_upload_time = float(last_image_upload_time) if last_image_upload_time else 0
-
+    
+    def resize_image(image_data):
+        image = Image.open(io.BytesIO(base64.b64decode(image_data.split(",")[1])))
+        if image.format == 'GIF':
+            return image_data  # Skip resizing for GIFs to keep animations
+        
+        ratio = image.width / image.height
+        width = int(200 * ratio)  # Calculate width while maintaining aspect ratio
+        height = 200  # Fixed height
+        
+        image = image.resize((width, height))
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+        
+        resized_image_data = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        return f"data:image/png;base64,{resized_image_data}"
+    
     if validate_username(username) and image_data:
-        if current_time - last_image_upload_time < IMAGE_UPLOAD_COOLDOWN:
-            remaining_time = int(IMAGE_UPLOAD_COOLDOWN - (current_time - last_image_upload_time))
+        # Check if the user has uploaded an image within the last 5 minutes
+        if session_id in last_image_upload and (current_time - last_image_upload[session_id] < IMAGE_UPLOAD_COOLDOWN):
+            remaining_time = int(IMAGE_UPLOAD_COOLDOWN - (current_time - last_image_upload[session_id]))
             minutes, seconds = divmod(remaining_time, 60)
             emit('error', {'message': f"Please wait {minutes}:{seconds:02d} before uploading another image."}, broadcast=False)
         else:
-            response = make_response()
             last_image_upload[session_id] = current_time
-            resized_image_data = resize_image(image_data, MAX_IMAGE_SIZE)
-            profile_pic = profile_pictures.get(session_id, get_random_profile_image())
-            profile_pictures[session_id] = resized_image_data  # Update profile picture
-            grouped = should_group_message(last_message, session_id, current_time)
-            past_messages.append({'type': 'image', 'username': username, 'image': resized_image_data, 'timestamp': current_time, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id})
-            if len(past_messages) > 30:
-                past_messages.pop(0)
-            emit('image', {'type': 'image', 'username': username, 'image': resized_image_data, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id}, broadcast=True)
-            # Update last message tracking
-            last_message = {'session_id': session_id, 'timestamp': current_time}
-            response.set_cookie('last_image_upload_time', str(current_time), max_age=7*24*60*60)  # 7 days
-            return response
+            resized_image_data = resize_image(image_data)
+            
+            emit('image', {'username': username, 'image': resized_image_data}, broadcast=True)
     else:
         emit('error', {'message': 'Invalid input or missing image data'}, broadcast=False)
 
