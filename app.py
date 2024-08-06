@@ -37,7 +37,7 @@ HACK_BAN_PERIOD = 5 * 60  # seconds
 JOIN_THRESHOLD = 7  # Number of joins within the period to trigger ban
 JOIN_PERIOD = 10  # Period in seconds to check for join frequency
 USERNAME_CHANGE_PERIOD = 60  # 1 minute in seconds
-IMAGE_UPLOAD_COOLDOWN = 2 # 1 minute in seconds
+IMAGE_UPLOAD_COOLDOWN = 2 * 60  # 2 minutes in seconds
 PROFILE_PIC_SIZE = (50, 50)  # Size of the profile picture
 MAX_IMAGE_SIZE = (1024, 1024)  # Max size for uploaded images
 GROUP_MESSAGE_TIME = 3 * 60  # 3 minutes in seconds
@@ -142,21 +142,21 @@ def sanitize_input(text):
     return bleach.clean(text, tags=set([]))
 
 # Function to resize an image, handling GIFs to retain animation
-def resize_image(image_data, max_size):
+def resize_image(image_data):
     image = Image.open(io.BytesIO(base64.b64decode(image_data.split(",")[1])))
-    output = io.BytesIO()
-    
     if image.format == 'GIF':
-        frames = []
-        for frame in ImageSequence.Iterator(image):
-            frame = ImageOps.fit(frame.convert('RGBA'), max_size, Image.Resampling.LANCZOS)
-            frames.append(frame)
-        frames[0].save(output, format="GIF", save_all=True, append_images=frames[1:], loop=0, duration=image.info['duration'])
-    else:
-        image.thumbnail(max_size)
-        image.save(output, format=image.format)
-    
-    return f"data:image/{image.format.lower()};base64,{base64.b64encode(output.getvalue()).decode('utf-8')}"
+        return image_data  # Skip resizing for GIFs to keep animations
+
+    ratio = image.width / image.height
+    width = int(200 * ratio)  # Calculate width while maintaining aspect ratio
+    height = 200  # Fixed height
+
+    image = image.resize((width, height))
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+
+    resized_image_data = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    return f"data:image/png;base64,{resized_image_data}"
 
 def format_datetime(timestamp):
     now = datetime.now()
@@ -349,25 +349,11 @@ def handle_disconnect():
 def handle_image(data):
     username = sanitize_input(data.get('username', ''))
     image_data = data.get('image')
-    session_id = data.get('session_id')
+    session_id = request.cookies.get('session_id')
     current_time = time.time()
-    
-    def resize_image(image_data):
-        image = Image.open(io.BytesIO(base64.b64decode(image_data.split(",")[1])))
-        if image.format == 'GIF':
-            return image_data  # Skip resizing for GIFs to keep animations
-        
-        ratio = image.width / image.height
-        width = int(200 * ratio)  # Calculate width while maintaining aspect ratio
-        height = 200  # Fixed height
-        
-        image = image.resize((width, height))
-        buffered = io.BytesIO()
-        image.save(buffered, format="PNG")
-        
-        resized_image_data = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        return f"data:image/png;base64,{resized_image_data}"
-    
+    profile_pic = profile_pictures.get(session_id, get_random_profile_image())
+    formatted_datetime = format_datetime(current_time)
+
     if validate_username(username) and image_data:
         # Check if the user has uploaded an image within the last 5 minutes
         if session_id in last_image_upload and (current_time - last_image_upload[session_id] < IMAGE_UPLOAD_COOLDOWN):
@@ -377,8 +363,15 @@ def handle_image(data):
         else:
             last_image_upload[session_id] = current_time
             resized_image_data = resize_image(image_data)
-            
-            emit('image', {'username': username, 'image': resized_image_data}, broadcast=True)
+
+            global last_message
+            grouped = should_group_message(last_message, session_id, current_time)
+            past_messages.append({'type': 'image', 'username': username, 'image': resized_image_data, 'timestamp': current_time, 'formatted_datetime': formatted_datetime, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id})
+            if len(past_messages) > 30:
+                past_messages.pop(0)
+            emit('image', {'type': 'image', 'username': username, 'image': resized_image_data, 'formatted_datetime': formatted_datetime, 'profile_pic': profile_pic, 'grouped': grouped, 'session_id': session_id}, broadcast=True)
+            # Update last message tracking
+            last_message = {'session_id': session_id, 'timestamp': current_time}
     else:
         emit('error', {'message': 'Invalid input or missing image data'}, broadcast=False)
 
@@ -396,7 +389,7 @@ def handle_profile_image(data):
         emit('error', {'message': f"Please wait {minutes}:{seconds:02d} before changing your profile image again."}, broadcast=False)
     else:
         if image_data:
-            resized_image_data = resize_image(image_data, PROFILE_PIC_SIZE)
+            resized_image_data = resize_image(image_data)
             profile_pictures[session_id] = resized_image_data
 
             response = make_response(emit('profile_image_updated', {'image': resized_image_data, 'session_id': session_id}, broadcast=False))
