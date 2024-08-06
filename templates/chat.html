@@ -564,7 +564,7 @@
             document.getElementById('rejoin_button').onclick = function() {
                 const savedScheme = getCookie('color_scheme') || 1;
                 setCookie('rejoin', 'true', 1);
-                location.reload();
+                location.back();
                 setColorScheme(savedScheme);
             };
 
