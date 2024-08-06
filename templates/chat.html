@@ -562,11 +562,7 @@
             document.getElementById('full-screen-image').style.display = 'none';
 
             document.getElementById('rejoin_button').onclick = function() {
-                const savedScheme = getCookie('color_scheme') || 1;
-                setCookie('rejoin', 'true', 1);
-                location.back();
-                location.reload();
-                setColorScheme(savedScheme);
+                window.location.href = 'https://skibcord.site/freak';
             };
 
             if (getCookie('rejoin') === 'true') {
