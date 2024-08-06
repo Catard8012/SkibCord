@@ -16,6 +16,9 @@ app.config['SECRET_KEY'] = 'W0rmyOn@St1ck'
 csrf = CSRFProtect(app)
 socketio = SocketIO(app, cors_allowed_origins="*", ping_interval=10, ping_timeout=60*2)
 
+# Australian Eastern Standard Time (AEST) offset
+AEST_OFFSET = 10  # UTC+10
+
 # Dictionaries for tracking sessions, usernames, and cooldowns
 session_message_times = {}
 session_usernames = {}
@@ -37,7 +40,7 @@ HACK_BAN_PERIOD = 5 * 60  # seconds
 JOIN_THRESHOLD = 7  # Number of joins within the period to trigger ban
 JOIN_PERIOD = 10  # Period in seconds to check for join frequency
 USERNAME_CHANGE_PERIOD = 60  # 1 minute in seconds
-IMAGE_UPLOAD_COOLDOWN = 60  # 1 minutes in seconds
+IMAGE_UPLOAD_COOLDOWN = 60  # 1 minute in seconds
 PROFILE_PIC_SIZE = (50, 50)  # Size of the profile picture
 MAX_IMAGE_SIZE = (1024, 1024)  # Max size for uploaded images
 GROUP_MESSAGE_TIME = 3 * 60  # 3 minutes in seconds
@@ -159,8 +162,8 @@ def resize_image(image_data):
     return f"data:image/png;base64,{resized_image_data}"
 
 def format_datetime(timestamp):
-    now = datetime.now()
-    dt = datetime.fromtimestamp(timestamp)
+    now = datetime.utcnow() + timedelta(hours=AEST_OFFSET)
+    dt = datetime.utcfromtimestamp(timestamp) + timedelta(hours=AEST_OFFSET)
     
     if dt.date() == now.date():
         return f"Today at {dt.strftime('%I:%M%p').lower()}"
