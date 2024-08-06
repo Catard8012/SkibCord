@@ -240,10 +240,11 @@ body {
 /* Chat image styling */
 .chat-image {
     width: auto;
-    max-width: 200px;
+    /* max-width: 200px; */
     height: auto;
     margin-right: 20px;
     border-radius: 5px;
+    object-fit: cover;
 }
 
 #image_input_label {
@@ -505,11 +506,9 @@ body {
     padding-top: 5px; /* Add padding between grouped messages */
 }
 .chat-image {
-    max-width: 200px;
-    max-height: 200px;
     object-fit: cover;
-    padding-left: 60px;  /* Adjust padding to match text position */
 }
+
 .group-start {
     padding-top: 10px; /* Padding between the start of each group */
     margin-bottom: -5px; /* Adjust margin to handle grouped messages */
