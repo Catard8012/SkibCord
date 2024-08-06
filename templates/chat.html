@@ -565,6 +565,7 @@
                 const savedScheme = getCookie('color_scheme') || 1;
                 setCookie('rejoin', 'true', 1);
                 location.back();
+                location.reload();
                 setColorScheme(savedScheme);
             };
 
