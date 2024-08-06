@@ -195,7 +195,7 @@
                     if (msg.type === 'message') {
                         appendMessage(msg.text, msg.username, msg.formatted_datetime, msg.profile_pic, msg.grouped, msg.session_id);
                     } else if (msg.type === 'image') {
-                        appendImage(msg.image, msg.username, msg.profile_pic, msg.grouped, msg.session_id);
+                        appendImage(msg.image, msg.username, msg.formatted_datetime, msg.profile_pic, msg.grouped, msg.session_id);
                     }
                 });
             }
@@ -263,7 +263,7 @@
                 lastMessageSessionId = session_id;
             }
 
-            function appendImage(imageData, username = '', profilePic = '', grouped = false, session_id = '') {
+            function appendImage(imageData, username = '', datetime = '', profilePic = '', grouped = false, session_id = '') {
                 const messageWrapper = document.createElement('div');
                 messageWrapper.classList.add('message-wrapper');
 
@@ -276,18 +276,40 @@
                     img.classList.add('profile-pic');
                     img.dataset.sessionId = session_id;
                     messageWrapper.appendChild(img);
+
+                    const messageContent = document.createElement('div');
+                    messageContent.classList.add('message-content');
+
+                    const header = document.createElement('div');
+                    header.classList.add('message-header');
+
+                    if (username) {
+                        const spanUsername = document.createElement('span');
+                        spanUsername.classList.add('username');
+                        spanUsername.textContent = username;
+                        const spanTime = document.createElement('span');
+                        spanTime.classList.add('timestamp');
+                        spanTime.textContent = ` ${datetime}`;
+                        header.appendChild(spanUsername);
+                        header.appendChild(spanTime);
+                    }
+
+                    const imgElement = document.createElement('img');
+                    imgElement.src = imageData;
+                    imgElement.classList.add('chat-image');
+
+                    messageContent.appendChild(header);
+                    messageContent.appendChild(imgElement);
+
+                    p.appendChild(messageContent);
+                    p.classList.add('group-start'); // Ensure proper positioning for the first image
+                } else {
+                    p.classList.add('grouped-message');
+                    const imgElement = document.createElement('img');
+                    imgElement.src = imageData;
+                    imgElement.classList.add('chat-image');
+                    p.appendChild(imgElement);
                 }
-
-                const messageContent = document.createElement('div');
-                messageContent.classList.add('message-content');
-
-                const imgElement = document.createElement('img');
-                imgElement.src = imageData;
-                imgElement.classList.add('chat-image');
-
-                messageContent.appendChild(imgElement);
-
-                p.appendChild(messageContent);
 
                 messageWrapper.appendChild(p);
                 messages.appendChild(messageWrapper);
@@ -449,7 +471,7 @@
             });
 
             socket.on('image', function(data) {
-                appendImage(data.image, data.username, data.profile_pic, data.grouped, data.session_id);
+                appendImage(data.image, data.username, data.formatted_datetime, data.profile_pic, data.grouped, data.session_id);
             });
 
             socket.on('user joined', function(data) {
