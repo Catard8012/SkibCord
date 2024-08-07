@@ -14,12 +14,12 @@
         let lastMessageSessionId = null;
         let scheme2Counter = 0;
         let scheme2Timer = null;
-        window.history.pushState(null, "","/")
+        window.history.pushState(null, "", "/")
 
         var bdgr = new Badger({});
-        window,isFocused = true
+        window.isFocused = true;
 
-        // call this to increment a number in the favicon
+        // Call this to increment a number in the favicon
         function ping() {
             if (window.isFocused) return 0;
             console.log("pinged");
@@ -27,6 +27,7 @@
             bdgr.value++;
             console.log(bdgr.value);
         }
+
         function notify() {
             if (window.isFocused) return 0;
             if (!(bdgr.value + 1)) bdgr.value = 0;
@@ -42,7 +43,7 @@
         function getCookie(name) {
             const nameEQ = name + "=";
             const ca = document.cookie.split(';');
-            for (let i = 0; ca.length > i; i++) {
+            for (let i = 0; i < ca.length; i++) {
                 let c = ca[i].trim();
                 if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
             }
@@ -228,12 +229,12 @@
             handleJoin(isNewUser);
 
             function appendMessage(content, username = '', datetime = '', profilePic = '', grouped = false, session_id = '') {
-                notify()
+                notify();
 
                 if (username) {
-                    var pingRegex = new RegExp(`(?<=^|\\s)@${username}(?=\\s|$)`,"i"),
-                        hasPing = content.search(pingRegex)!=-1
-                    if (hasPing) ping()
+                    var pingRegex = new RegExp(`(?<=^|\\s)@${username}(?=\\s|$)`, "i"),
+                        hasPing = content.search(pingRegex) != -1;
+                    if (hasPing) ping();
                 }
 
                 const messageWrapper = document.createElement('div');
@@ -345,11 +346,13 @@
             }
 
             function scrollToBottom() {
+                const messages = document.getElementById('messages');
                 messages.scrollTop = messages.scrollHeight;
             }
 
             function ensureMessageLimit() {
                 const maxMessages = 30;
+                const messages = document.getElementById('messages');
                 while (messages.children.length > maxMessages) {
                     messages.removeChild(messages.firstChild);
                 }
@@ -587,7 +590,7 @@
             document.getElementById('full-screen-image').style.display = 'none';
 
             document.getElementById('rejoin_button').onclick = function() {
-                window.location.href = window.location.href+"skibchat"
+                window.location.href = window.location.href + "skibchat";
             };
 
             if (getCookie('rejoin') === 'true') {
