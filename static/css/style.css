@@ -513,3 +513,13 @@ body {
     padding-top: 10px; /* Padding between the start of each group */
     margin-bottom: -5px; /* Adjust margin to handle grouped messages */
 }
+
+/* Style for the message wrapper */
+.message-wrapper {
+    transition: background-color 0.2s ease-in-out;
+}
+
+/* Darken the background when hovering over the message */
+.message-wrapper:hover {
+    background-color: rgba(0, 0, 0, 0.1); /* Adjust the color and transparency as needed */
+}
