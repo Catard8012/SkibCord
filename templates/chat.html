@@ -7,6 +7,7 @@
     <title>SkibCord</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/badger.js') }}"></script>
     <script>
         let isHbLogo = true;
         let lastProfileImageChange = 0;
@@ -14,6 +15,22 @@
         let scheme2Counter = 0;
         let scheme2Timer = null;
         window.history.pushState(null, "","/")
+
+        var bdgr = new Badger({});
+        window,isFocused = true
+
+        // call this to increment a number in the favicon
+        function ping() {
+            if (window.isFocused) return 0;
+            console.log("pinged");
+            if (!(bdgr.value + 1)) bdgr.value = 0;
+            bdgr.value++;
+            console.log(bdgr.value);
+        }
+        function notify() {
+            if (window.isFocused) return 0;
+            if (!(bdgr.value + 1)) bdgr.value = 0;
+        }
 
         function setCookie(name, value, days) {
             const date = new Date();
@@ -211,6 +228,14 @@
             handleJoin(isNewUser);
 
             function appendMessage(content, username = '', datetime = '', profilePic = '', grouped = false, session_id = '') {
+                notify()
+
+                if (username) {
+                    var pingRegex = new RegExp(`(?<=^|\\s)@${username}(?=\\s|$)`,"i"),
+                        hasPing = content.search(pingRegex)!=-1
+                    if (hasPing) ping()
+                }
+
                 const messageWrapper = document.createElement('div');
                 messageWrapper.classList.add('message-wrapper');
 
@@ -574,10 +599,13 @@
             setColorScheme(savedScheme);
 
             window.addEventListener('focus', () => {
+                bdgr.value = undefined;
+                window.isFocused = true;
                 socket.emit('focus', { username: username, session_id: sessionId });
             });
 
             window.addEventListener('blur', () => {
+                window.isFocused = false;
                 socket.emit('blur', { username: username, session_id: sessionId });
             });
         });
