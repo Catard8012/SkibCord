@@ -334,9 +334,6 @@ body {
 
 }
 
-.chat-message-ping {
-    background-color: var(--text-background-colour-ping);
-}
 
 .timestamp {
     font-size: 0.8em;
