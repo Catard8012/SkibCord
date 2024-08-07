@@ -3,7 +3,6 @@
     --main-color: #472DA6;
     --secondary-color: #6841F2;
     --text-color: white;
-    --text-background-colour-ping: #ffe100cb;
     --background-color: #3B3939;
 }
 
@@ -333,7 +332,6 @@ body {
     color: var(--text-color);
 
 }
-
 
 .timestamp {
     font-size: 0.8em;
