@@ -250,9 +250,8 @@ def handle_message(data):
 @socketio.on('join')
 def handle_join(data):
     username = sanitize_input(data.get('username', ''))
-    ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
+    ip_id = request.environ.get('REMOTE_ADDR') + ":" + str(request.environ.get('REMOTE_PORT'))
     username_lower = username.lower()
-    current_time = time.time()
     session_id = request.cookies.get('session_id')
     profile_pic = profile_pictures.get(session_id, get_random_profile_image())
 
@@ -264,10 +263,15 @@ def handle_join(data):
 
             profile_pictures[session_id] = profile_pic
 
-            # Check if user is new or returning
+            # Check if the user is new or returning
             if data.get('is_new_user', True):
                 join_message = f'{username} has joined the chat'
-                # send_skibbot_message(join_message)
+                emit('message', {
+                    'username': 'SkibBot',
+                    'text': join_message,
+                    'color': '#d16262',
+                    'profile_pic': 'static/Images/SkibBot.png'
+                }, broadcast=True)
 
         emit('update user count', {'count': len(active_usernames)}, broadcast=True)
         emit('update online users', {'users': list(active_usernames)}, broadcast=True)
@@ -337,7 +341,6 @@ def handle_change_username(data):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    session_id = request.cookies.get('session_id')
     ip_id = request.environ.get('REMOTE_ADDR')+":"+str(request.environ.get('REMOTE_PORT'))
     if ip_id in active_tabs:
         active_tabs[ip_id] -= 1
