@@ -209,7 +209,7 @@
             let scheme2Timer = null;
 
             function appendPastMessages() {
-                const pastMessages = {{ past_messages | tojson }};
+                const pastMessages = JSON.parse('{{ past_messages | tojson | safe }}');
                 pastMessages.forEach(msg => {
                     if (msg.type === 'message') {
                         appendMessage(msg.text, msg.username, msg.formatted_datetime, msg.profile_pic, msg.grouped, msg.session_id);
